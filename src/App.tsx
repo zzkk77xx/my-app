@@ -1,7 +1,8 @@
+import Mockup from "./Mockup";
 import Wallet from "./Wallet";
 
 function App() {
-  return <Wallet />;
+  return <Mockup />;
 }
 
 export default App;
