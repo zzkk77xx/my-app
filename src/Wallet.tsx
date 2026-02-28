@@ -8,6 +8,7 @@ import {
   parseAmount,
   shortenHex,
 } from "@unlink-xyz/react";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -60,6 +61,11 @@ export default function Wallet() {
   // ── Settings
   const [exportedMnemonic, setExportedMnemonic] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
+
+  // ── Privy (unconditional)
+  const { ready: privyReady, authenticated, login, logout } = usePrivy();
+  const { wallets } = useWallets();
+  const externalWallet = wallets[0];
 
   // ── Hooks (unconditional)
   const {
@@ -176,6 +182,24 @@ export default function Wallet() {
               <button className={linkBtn} onClick={() => setSetupScreen("import")}>
                 Import existing wallet
               </button>
+
+              <div className="border-t border-[#333] mt-5 pt-5">
+                <p className="text-[#888] text-[0.8rem] mb-3">Or connect an external wallet</p>
+                {!privyReady ? (
+                  <button className={btnGhost} disabled>Loading…</button>
+                ) : authenticated && externalWallet ? (
+                  <div className={infoBox}>
+                    <div className="text-[0.8rem] mb-2">
+                      Connected: {shortenHex(externalWallet.address, 6)}
+                    </div>
+                    <button className={btnGhost} onClick={logout}>Disconnect</button>
+                  </div>
+                ) : (
+                  <button className={btnGhost} onClick={login}>
+                    Connect Wallet
+                  </button>
+                )}
+              </div>
             </>
           )}
 
@@ -315,6 +339,20 @@ export default function Wallet() {
                 ))}
               </div>
             )}
+
+            <div className={sectionCls}>
+              <label className={labelCls}>External wallet</label>
+              {!privyReady ? (
+                <p className="text-[#666] text-[0.85rem]">Loading…</p>
+              ) : authenticated && externalWallet ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[0.85rem] text-[#e0e0e0]">{shortenHex(externalWallet.address, 8)}</span>
+                  <button className={btnSmGhost} onClick={logout}>Disconnect</button>
+                </div>
+              ) : (
+                <button className={btnGhost} onClick={login}>Connect Wallet</button>
+              )}
+            </div>
 
             <button className={btn} onClick={() => refresh()} disabled={busy}>
               Refresh
