@@ -16,20 +16,20 @@ const TOKEN_DECIMALS = 18;
 
 // --- Color tokens ---
 const C = {
-  bg: "#0A0E17",
-  card: "#121826",
-  border: "#1E2640",
+  bg: "#F4F6FA",
+  card: "#FFFFFF",
+  border: "#E4E8F0",
   accent: "#6C5CE7",
-  accentSoft: "rgba(108,92,231,0.12)",
-  green: "#00D68F",
-  greenSoft: "rgba(0,214,143,0.10)",
-  red: "#FF6B6B",
-  redSoft: "rgba(255,107,107,0.10)",
-  textPrimary: "#EAEAF0",
-  textSecondary: "#7A8299",
-  textTertiary: "#4A5068",
-  yellow: "#FECA57",
-  yellowSoft: "rgba(254,202,87,0.10)",
+  accentSoft: "rgba(108,92,231,0.09)",
+  green: "#00A86B",
+  greenSoft: "rgba(0,168,107,0.10)",
+  red: "#E5334A",
+  redSoft: "rgba(229,51,74,0.10)",
+  textPrimary: "#0D1117",
+  textSecondary: "#5A6478",
+  textTertiary: "#9AA3B0",
+  yellow: "#E09B00",
+  yellowSoft: "rgba(224,155,0,0.10)",
 };
 
 // --- Icons ---
@@ -216,7 +216,7 @@ const Icon = {
       height="14"
       fill="none"
       viewBox="0 0 24 24"
-      stroke="#00D68F"
+      stroke="#00A86B"
       strokeWidth="2.5"
     >
       <path
@@ -249,7 +249,7 @@ const phoneFrame: React.CSSProperties = {
   overflow: "hidden",
   fontFamily: "'SF Pro Display', 'Helvetica Neue', -apple-system, sans-serif",
   boxShadow:
-    "0 25px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset",
+    "0 25px 80px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06) inset",
 };
 
 // --- Helpers ---
@@ -423,7 +423,7 @@ function TransferModal({
           <button
             onClick={onClose}
             style={{
-              background: "rgba(255,255,255,0.08)",
+              background: "rgba(0,0,0,0.06)",
               border: "none",
               color: C.textSecondary,
               width: 32,
@@ -448,7 +448,6 @@ function TransferModal({
             gap: 10,
           }}
         >
-          <span style={{ fontSize: 18 }}>💼</span>
           <div>
             <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
               From: Checking Account
@@ -501,7 +500,7 @@ function TransferModal({
         >
           Amount
         </label>
-        <div style={{ position: "relative", marginBottom: 24 }}>
+        <div style={{ position: "relative", marginBottom: 16 }}>
           <input
             type="number"
             placeholder="0.00"
@@ -523,11 +522,18 @@ function TransferModal({
           />
         </div>
 
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 16, padding: "8px 12px", background: C.yellowSoft, border: `1px solid rgba(224,155,0,0.18)`, borderRadius: 10 }}>
+          <span style={{ color: C.yellow, fontSize: 13, marginTop: 1 }}>ⓘ</span>
+          <span style={{ color: C.yellow, fontSize: 12, lineHeight: 1.5 }}>
+            Transfers above <strong>10,000 MON</strong> require bank compliance verification before processing.
+          </span>
+        </div>
+
         {err && (
           <div
             style={{
               background: C.redSoft,
-              border: `1px solid rgba(255,107,107,0.2)`,
+              border: `1px solid rgba(229,51,74,0.2)`,
               borderRadius: 12,
               padding: "10px 14px",
               marginBottom: 16,
@@ -718,7 +724,7 @@ function DepositModal({
           <button
             onClick={onClose}
             style={{
-              background: "rgba(255,255,255,0.08)",
+              background: "rgba(0,0,0,0.06)",
               border: "none",
               color: C.textSecondary,
               width: 32,
@@ -768,7 +774,6 @@ function DepositModal({
                 gap: 10,
               }}
             >
-              <span style={{ fontSize: 20 }}>🏦</span>
               <div>
                 <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
                   Bank Transfer (SEPA / on-chain)
@@ -819,7 +824,7 @@ function DepositModal({
               <div
                 style={{
                   background: C.redSoft,
-                  border: `1px solid rgba(255,107,107,0.2)`,
+                  border: `1px solid rgba(229,51,74,0.2)`,
                   borderRadius: 12,
                   padding: "10px 14px",
                   marginBottom: 16,
@@ -834,7 +839,7 @@ function DepositModal({
               <div
                 style={{
                   background: C.greenSoft,
-                  border: `1px solid rgba(0,214,143,0.2)`,
+                  border: `1px solid rgba(0,168,107,0.2)`,
                   borderRadius: 12,
                   padding: "10px 14px",
                   marginBottom: 16,
@@ -942,7 +947,6 @@ function AddCardModal({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 26 }}>💳</span>
             <span
               style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}
             >
@@ -952,7 +956,7 @@ function AddCardModal({
           <button
             onClick={onClose}
             style={{
-              background: "rgba(255,255,255,0.08)",
+              background: "rgba(0,0,0,0.06)",
               border: "none",
               color: C.textSecondary,
               width: 32,
@@ -1076,7 +1080,7 @@ function AddCardModal({
           <div
             style={{
               background: C.redSoft,
-              border: `1px solid rgba(255,107,107,0.2)`,
+              border: `1px solid rgba(229,51,74,0.2)`,
               borderRadius: 12,
               padding: "10px 14px",
               marginBottom: 16,
@@ -1114,7 +1118,7 @@ function AddCardModal({
               flex: 1,
               padding: "14px",
               background: C.redSoft,
-              border: `1px solid rgba(255,107,107,0.2)`,
+              border: `1px solid rgba(229,51,74,0.2)`,
               borderRadius: 14,
               color: C.red,
               fontSize: 14,
@@ -1187,7 +1191,6 @@ function CardModal({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 28 }}>{card.emoji}</span>
             <div>
               <span
                 style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}
@@ -1211,7 +1214,7 @@ function CardModal({
           <button
             onClick={onClose}
             style={{
-              background: "rgba(255,255,255,0.08)",
+              background: "rgba(0,0,0,0.06)",
               border: "none",
               color: C.textSecondary,
               width: 32,
@@ -1370,7 +1373,7 @@ function CardModal({
               flex: 1,
               padding: "14px",
               background: C.redSoft,
-              border: `1px solid rgba(255,107,107,0.2)`,
+              border: `1px solid rgba(229,51,74,0.2)`,
               borderRadius: 14,
               color: C.red,
               fontSize: 14,
@@ -1448,7 +1451,6 @@ export default function S4bMobileApp() {
   const {
     data: balancesData,
     isLoading: balancesLoading,
-    refetch: refetchBalances,
   } = useQuery({
     queryKey: ["balances"],
     queryFn: async () => {
@@ -1466,7 +1468,6 @@ export default function S4bMobileApp() {
   const {
     data: eoasData,
     isLoading: eoasLoading,
-    refetch: refetchEoas,
   } = useQuery({
     queryKey: ["eoas", userAddress],
     queryFn: async () => {
@@ -1488,7 +1489,6 @@ export default function S4bMobileApp() {
   const {
     data: eventsData,
     isLoading: eventsLoading,
-    refetch: refetchEvents,
   } = useQuery({
     queryKey: ["events", spendInteractorAddress],
     queryFn: async () => {
@@ -1534,12 +1534,6 @@ export default function S4bMobileApp() {
     },
   });
 
-  function refetchAll() {
-    refetchBalances();
-    refetchEoas();
-    refetchEvents();
-  }
-
   // ── Derived
   const safeAddress = registrationData?.safeAddress ?? null;
   const balances = balancesData ?? {};
@@ -1564,7 +1558,7 @@ export default function S4bMobileApp() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#050810",
+          background: C.bg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1585,7 +1579,7 @@ export default function S4bMobileApp() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#050810",
+          background: C.bg,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -1650,7 +1644,7 @@ export default function S4bMobileApp() {
       <div
         style={{
           minHeight: "100vh",
-          background: "#050810",
+          background: C.bg,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -1746,7 +1740,7 @@ export default function S4bMobileApp() {
     name: "SpendAuthorized",
     amount: ev.amount ? parseFloat(fmtWei(ev.amount)) : 0,
     date: ev.blockNumber ? `Block ${ev.blockNumber}` : "",
-    icon: "📤",
+    icon: "",
     recipient: ev.recipient ? shortenAddr(ev.recipient, 6) : "",
     nonce: ev.nonce ?? "",
     txHash: ev.transactionHash ?? ev.txHash ?? "",
@@ -1763,7 +1757,7 @@ export default function S4bMobileApp() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#050810",
+        background: C.bg,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1884,7 +1878,7 @@ export default function S4bMobileApp() {
                   <div
                     style={{
                       background: C.redSoft,
-                      border: `1px solid rgba(255,107,107,0.2)`,
+                      border: `1px solid rgba(229,51,74,0.2)`,
                       borderRadius: 12,
                       padding: "10px 14px",
                       marginBottom: 16,
@@ -2145,7 +2139,6 @@ export default function S4bMobileApp() {
                             marginBottom: 12,
                           }}
                         >
-                          <span style={{ fontSize: 22 }}>{card.emoji}</span>
                           <div
                             style={{
                               width: 8,
@@ -2532,7 +2525,6 @@ export default function S4bMobileApp() {
                     <div
                       style={{ display: "flex", alignItems: "center", gap: 6 }}
                     >
-                      <span style={{ fontSize: 14 }}>📉</span>
                       <span style={{ color: C.textSecondary, fontSize: 13 }}>
                         Authorized spends
                       </span>
@@ -2591,7 +2583,6 @@ export default function S4bMobileApp() {
                       gap: 8,
                     }}
                   >
-                    <span style={{ fontSize: 16 }}>💡</span>
                     <div style={{ color: C.green, fontSize: 12 }}>
                       Your balance is held in the shared S4b spending pool —
                       earning native yield on every MON.
@@ -2647,7 +2638,6 @@ export default function S4bMobileApp() {
                             gap: 10,
                           }}
                         >
-                          <span style={{ fontSize: 24 }}>{card.emoji}</span>
                           <div>
                             <div
                               style={{
@@ -3145,7 +3135,7 @@ export default function S4bMobileApp() {
                     style={{
                       padding: "8px 16px",
                       background: C.redSoft,
-                      border: `1px solid rgba(255,107,107,0.2)`,
+                      border: `1px solid rgba(229,51,74,0.2)`,
                       borderRadius: 10,
                       color: C.red,
                       fontSize: 12,
@@ -3215,7 +3205,6 @@ export default function S4bMobileApp() {
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ fontSize: 22, marginRight: 14 }}>🔐</span>
                   <div style={{ flex: 1 }}>
                     <div
                       style={{
@@ -3245,27 +3234,22 @@ export default function S4bMobileApp() {
                   {
                     label: "Notifications",
                     sub: "Push, Email, SMS",
-                    emoji: "🔔",
                   },
                   {
                     label: "Payment Methods",
                     sub: "SEPA, Wire Transfer",
-                    emoji: "💶",
                   },
                   {
                     label: "Documents & Statements",
                     sub: "Monthly reports, Tax docs",
-                    emoji: "📄",
                   },
                   {
                     label: "Help & Support",
                     sub: "FAQ, Live chat",
-                    emoji: "💬",
                   },
                   {
                     label: "Legal",
                     sub: "Terms, Privacy, Licenses",
-                    emoji: "⚖️",
                   },
                 ].map((item, i) => (
                   <div
@@ -3281,9 +3265,6 @@ export default function S4bMobileApp() {
                       cursor: "pointer",
                     }}
                   >
-                    <span style={{ fontSize: 22, marginRight: 14 }}>
-                      {item.emoji}
-                    </span>
                     <div style={{ flex: 1 }}>
                       <div
                         style={{
@@ -3320,8 +3301,7 @@ export default function S4bMobileApp() {
               bottom: 0,
               left: 0,
               right: 0,
-              background: `${C.bg}F0`,
-              backdropFilter: "blur(20px)",
+              background: C.card,
               borderTop: `1px solid ${C.border}`,
               display: "flex",
               justifyContent: "space-around",
