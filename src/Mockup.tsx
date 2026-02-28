@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   usePrivy,
   useWallets,
@@ -7,12 +7,27 @@ import {
   getEmbeddedConnectedWallet,
 } from "@privy-io/react-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { encodeFunctionData, keccak256, encodePacked } from "viem";
 
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const AAVE_LOGO = "https://cryptologos.cc/logos/aave-aave-logo.svg";
 const UNI_LOGO = "https://cryptologos.cc/logos/uniswap-uni-logo.svg";
 const TOKEN_DECIMALS = 18;
+
+const AUTHORIZE_SPEND_ABI = [
+  {
+    type: "function",
+    name: "authorizeSpend",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "recipientHash", type: "bytes32" },
+      { name: "transferType", type: "uint8" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
 
 // --- Color tokens ---
 const C = {
@@ -285,93 +300,64 @@ function parseWei(amount: string, decimals = TOKEN_DECIMALS): string {
   }
 }
 
-// --- Relay status poller ---
-function useRelayStatus(relayId: string | null) {
-  const [status, setStatus] = useState<{
-    state: string;
-    txHash?: string;
-  } | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!relayId) {
-      setStatus(null);
-      return;
-    }
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const res = await fetch(`${API_URL}/relay/${relayId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) setStatus(data);
-        if (
-          data.state === "confirmed" ||
-          data.state === "success" ||
-          data.state === "failed"
-        ) {
-          if (timer.current) clearInterval(timer.current);
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-
-    poll();
-    timer.current = setInterval(poll, 4000);
-    return () => {
-      cancelled = true;
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [relayId]);
-
-  return status;
-}
 
 // --- Transfer Modal ---
 function TransferModal({
   onClose,
   nativeBalance,
+  spendInteractorAddress,
+  userAddress,
 }: {
   onClose: () => void;
   nativeBalance: string;
+  spendInteractorAddress: string | null;
+  userAddress: string;
 }) {
+  const { wallets } = useWallets();
+  const wallet = wallets[0];
+
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [relayId, setRelayId] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
-  const txStatus = useRelayStatus(relayId);
 
   async function handleSend() {
     if (!amount || !recipient || sending) return;
+    if (!spendInteractorAddress) { setErr("Account setup not yet complete."); return; }
+    if (!wallet) { setErr("No wallet connected."); return; }
+
     setSending(true);
     setErr("");
-    setRelayId(null);
+    setTxHash(null);
     try {
-      // Pre-register recipient mapping
+      // 1. Pre-register recipient mapping so the watcher can resolve the hash
       fetch(`${API_URL}/recipients/by-address`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: recipient }),
       }).catch(() => {});
 
-      const res = await fetch(`${API_URL}/withdraw`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: NATIVE_TOKEN,
-          amount: parseWei(amount),
-          recipient,
-        }),
+      // 2. recipientHash = keccak256(abi.encodePacked(address)) — matches Solidity
+      const recipientHash = keccak256(
+        encodePacked(["address"], [recipient as `0x${string}`])
+      );
+
+      // 3. Encode authorizeSpend(amount, recipientHash, transferType=1)
+      const calldata = encodeFunctionData({
+        abi: AUTHORIZE_SPEND_ABI,
+        functionName: "authorizeSpend",
+        args: [BigInt(parseWei(amount)), recipientHash, 1],
       });
-      if (!res.ok) {
-        const b = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(b?.error ?? res.statusText);
-      }
-      const { relayId: rid } = await res.json();
-      setRelayId(rid);
+
+      // 4. EOA signs & submits the tx — msg.sender must be the registered EOA
+      const provider = await wallet.getEthereumProvider();
+      const hash = await provider.request({
+        method: "eth_sendTransaction",
+        params: [{ from: userAddress, to: spendInteractorAddress, data: calldata }],
+      });
+
+      setTxHash(hash as string);
       setAmount("");
       setRecipient("");
     } catch (e) {
@@ -380,13 +366,6 @@ function TransferModal({
       setSending(false);
     }
   }
-
-  const badgeColor = (s: string) =>
-    s === "confirmed" || s === "success"
-      ? C.green
-      : s === "pending"
-        ? C.yellow
-        : C.red;
 
   return (
     <div
@@ -545,49 +524,15 @@ function TransferModal({
           </div>
         )}
 
-        {relayId && (
-          <div
-            style={{
-              background: C.accentSoft,
-              borderRadius: 12,
-              padding: "10px 14px",
-              marginBottom: 16,
-              fontSize: 13,
-            }}
-          >
-            <div style={{ color: C.textSecondary, marginBottom: 4 }}>
-              Relay: {shortenAddr(relayId, 8)}
+        {txHash && (
+          <div style={{ background: C.greenSoft, border: `1px solid rgba(0,168,107,0.2)`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
+            <div style={{ color: C.green, fontWeight: 600, marginBottom: 4 }}>Transfer authorized on-chain</div>
+            <div style={{ color: C.textSecondary, fontSize: 12 }}>
+              Tx: {shortenAddr(txHash, 10)}
             </div>
-            {txStatus && (
-              <>
-                <div>
-                  <span style={{ color: C.textSecondary }}>Status: </span>
-                  <span
-                    style={{
-                      background: badgeColor(txStatus.state),
-                      color: "#fff",
-                      borderRadius: 6,
-                      padding: "2px 8px",
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {txStatus.state}
-                  </span>
-                </div>
-                {txStatus.txHash && (
-                  <div
-                    style={{
-                      color: C.textTertiary,
-                      marginTop: 4,
-                      fontSize: 12,
-                    }}
-                  >
-                    Tx: {shortenAddr(txStatus.txHash, 10)}
-                  </div>
-                )}
-              </>
-            )}
+            <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 4 }}>
+              The backend is processing the transfer — funds will move shortly.
+            </div>
           </div>
         )}
 
@@ -3350,6 +3295,8 @@ export default function S4bMobileApp() {
             <TransferModal
               onClose={() => setShowTransfer(false)}
               nativeBalance={nativeBalance}
+              spendInteractorAddress={spendInteractorAddress}
+              userAddress={userAddress}
             />
           )}
           {showDeposit && (
