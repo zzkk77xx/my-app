@@ -175,6 +175,13 @@ export default function Wallet() {
     if (!sendAmount || !sendRecipient) return;
     resetSend();
     setLastRelayId(null);
+    // Pre-register recipient mapping so the watcher can resolve it if a
+    // SpendAuthorized event fires for the same address later.
+    fetch(`${API_URL}/recipients/by-address`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: sendRecipient }),
+    }).catch(() => {/* best-effort, don't block the send */});
     const token = sendToken === "custom" ? sendTokenCustom.trim() : sendToken;
     const amount = parseAmount(sendAmount, 18);
     const result = await send([{ token, recipient: sendRecipient, amount }]);
