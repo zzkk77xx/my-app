@@ -37,15 +37,23 @@ function SwapForm() {
   }
 
   return (
-    <div>
-      <button onClick={handleSwap} disabled={isPending}>
+    <div className="flex flex-col gap-3">
+      <button
+        className="bg-[#646cff] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer disabled:opacity-50"
+        onClick={handleSwap}
+        disabled={isPending}
+      >
         {isPending ? "Swapping..." : "Swap"}
       </button>
 
-      {error && <p>Error: {error.message}</p>}
+      {error && (
+        <p className="bg-[#3a1a1a] border border-[#c0392b] rounded-md px-3.5 py-2.5 text-[#ff8080] text-sm m-0">
+          Error: {error.message}
+        </p>
+      )}
 
       {txStatus.state && (
-        <p>
+        <p className="bg-[#1a2a3a] border border-[#3a6a9a] rounded-md px-3.5 py-2.5 text-[#80c0ff] text-sm m-0">
           Status: {txStatus.state}
           {txStatus.txHash && ` (${txStatus.txHash})`}
         </p>

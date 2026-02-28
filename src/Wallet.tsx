@@ -9,212 +9,6 @@ import {
   shortenHex,
 } from "@unlink-xyz/react";
 
-const S = {
-  root: {
-    minHeight: "100vh",
-    background: "#1a1a1a",
-    color: "#e0e0e0",
-    fontFamily: "monospace",
-    display: "flex",
-    flexDirection: "column" as const,
-    alignItems: "center",
-    padding: "32px 16px",
-  },
-  card: {
-    background: "#242424",
-    border: "1px solid #444",
-    borderRadius: "12px",
-    padding: "32px",
-    width: "100%",
-    maxWidth: "520px",
-    boxSizing: "border-box" as const,
-  },
-  h1: { margin: "0 0 24px", fontSize: "1.4rem", color: "#fff" },
-  h2: { margin: "0 0 16px", fontSize: "1.1rem", color: "#ccc" },
-  label: { display: "block", marginBottom: "6px", fontSize: "0.8rem", color: "#aaa" },
-  input: {
-    width: "100%",
-    background: "#1a1a1a",
-    border: "1px solid #444",
-    borderRadius: "6px",
-    color: "#e0e0e0",
-    padding: "8px 10px",
-    fontSize: "0.9rem",
-    boxSizing: "border-box" as const,
-    outline: "none",
-    marginBottom: "12px",
-  },
-  textarea: {
-    width: "100%",
-    background: "#1a1a1a",
-    border: "1px solid #444",
-    borderRadius: "6px",
-    color: "#e0e0e0",
-    padding: "8px 10px",
-    fontSize: "0.85rem",
-    fontFamily: "monospace",
-    boxSizing: "border-box" as const,
-    outline: "none",
-    resize: "vertical" as const,
-    minHeight: "80px",
-    marginBottom: "12px",
-  },
-  btn: {
-    background: "#646cff",
-    border: "none",
-    borderRadius: "6px",
-    color: "#fff",
-    padding: "10px 20px",
-    fontSize: "0.9rem",
-    cursor: "pointer",
-    marginRight: "8px",
-    marginBottom: "8px",
-  },
-  btnDanger: {
-    background: "#c0392b",
-    border: "none",
-    borderRadius: "6px",
-    color: "#fff",
-    padding: "10px 20px",
-    fontSize: "0.9rem",
-    cursor: "pointer",
-    marginRight: "8px",
-    marginBottom: "8px",
-  },
-  btnGhost: {
-    background: "transparent",
-    border: "1px solid #444",
-    borderRadius: "6px",
-    color: "#aaa",
-    padding: "10px 20px",
-    fontSize: "0.9rem",
-    cursor: "pointer",
-    marginRight: "8px",
-    marginBottom: "8px",
-  },
-  btnSm: {
-    background: "#646cff",
-    border: "none",
-    borderRadius: "4px",
-    color: "#fff",
-    padding: "4px 10px",
-    fontSize: "0.8rem",
-    cursor: "pointer",
-  },
-  btnSmGhost: {
-    background: "transparent",
-    border: "1px solid #444",
-    borderRadius: "4px",
-    color: "#aaa",
-    padding: "4px 10px",
-    fontSize: "0.8rem",
-    cursor: "pointer",
-  },
-  link: {
-    background: "none",
-    border: "none",
-    color: "#646cff",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    padding: 0,
-    textDecoration: "underline",
-  },
-  mono: {
-    background: "#111",
-    border: "1px solid #333",
-    borderRadius: "6px",
-    padding: "10px 14px",
-    fontSize: "0.82rem",
-    wordBreak: "break-all" as const,
-    marginBottom: "12px",
-    color: "#b0ffb0",
-  },
-  error: {
-    background: "#3a1a1a",
-    border: "1px solid #c0392b",
-    borderRadius: "6px",
-    padding: "10px 14px",
-    color: "#ff8080",
-    fontSize: "0.85rem",
-    marginBottom: "12px",
-  },
-  warning: {
-    background: "#2a2000",
-    border: "1px solid #a08000",
-    borderRadius: "6px",
-    padding: "10px 14px",
-    color: "#ffd060",
-    fontSize: "0.85rem",
-    marginBottom: "12px",
-  },
-  info: {
-    background: "#1a2a3a",
-    border: "1px solid #3a6a9a",
-    borderRadius: "6px",
-    padding: "10px 14px",
-    color: "#80c0ff",
-    fontSize: "0.85rem",
-    marginBottom: "12px",
-  },
-  tabBar: {
-    display: "flex",
-    borderBottom: "1px solid #444",
-    marginBottom: "20px",
-    gap: "2px",
-    flexWrap: "wrap" as const,
-  },
-  tab: (active: boolean) => ({
-    background: "none",
-    border: "none",
-    borderBottom: active ? "2px solid #646cff" : "2px solid transparent",
-    color: active ? "#646cff" : "#888",
-    padding: "8px 14px",
-    cursor: "pointer",
-    fontSize: "0.85rem",
-    marginBottom: "-1px",
-  }),
-  row: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "8px 0",
-    borderBottom: "1px solid #333",
-  },
-  badge: (color: string) => ({
-    display: "inline-block",
-    background: color,
-    color: "#fff",
-    borderRadius: "4px",
-    padding: "2px 7px",
-    fontSize: "0.75rem",
-    marginRight: "6px",
-  }),
-  spinner: {
-    display: "inline-block",
-    width: "18px",
-    height: "18px",
-    border: "2px solid #444",
-    borderTop: "2px solid #646cff",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-    marginRight: "10px",
-    verticalAlign: "middle",
-  },
-  select: {
-    width: "100%",
-    background: "#1a1a1a",
-    border: "1px solid #444",
-    borderRadius: "6px",
-    color: "#e0e0e0",
-    padding: "8px 10px",
-    fontSize: "0.9rem",
-    boxSizing: "border-box" as const,
-    outline: "none",
-    marginBottom: "12px",
-  },
-  section: { marginBottom: "20px" },
-};
-
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
 function badgeColor(s: string) {
@@ -230,6 +24,22 @@ function kindColor(k: string) {
   if (k === "withdrawal") return "#856404";
   return "#444";
 }
+
+const btn = "bg-[#646cff] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2 disabled:opacity-50";
+const btnDanger = "bg-[#c0392b] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
+const btnGhost = "bg-transparent border border-[#444] rounded-md text-[#aaa] px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
+const btnSm = "bg-[#646cff] border-none rounded text-white px-2.5 py-1 text-[0.8rem] cursor-pointer";
+const btnSmGhost = "bg-transparent border border-[#444] rounded text-[#aaa] px-2.5 py-1 text-[0.8rem] cursor-pointer";
+const linkBtn = "bg-transparent border-none text-[#646cff] cursor-pointer text-sm p-0 underline";
+const inputCls = "w-full bg-[#1a1a1a] border border-[#444] rounded-md text-[#e0e0e0] px-2.5 py-2 text-sm box-border outline-none mb-3";
+const monoBox = "bg-[#111] border border-[#333] rounded-md px-3.5 py-2.5 text-[0.82rem] break-all mb-3 text-[#b0ffb0] font-mono";
+const errorBox = "bg-[#3a1a1a] border border-[#c0392b] rounded-md px-3.5 py-2.5 text-[#ff8080] text-sm mb-3";
+const warningBox = "bg-[#2a2000] border border-[#a08000] rounded-md px-3.5 py-2.5 text-[#ffd060] text-sm mb-3";
+const infoBox = "bg-[#1a2a3a] border border-[#3a6a9a] rounded-md px-3.5 py-2.5 text-[#80c0ff] text-sm mb-3";
+const labelCls = "block mb-1.5 text-[0.8rem] text-[#aaa]";
+const rowCls = "flex items-center justify-between py-2 border-b border-[#333]";
+const sectionCls = "mb-5";
+const spinner = "inline-block w-[18px] h-[18px] border-2 border-[#444] border-t-[#646cff] rounded-full animate-spin mr-2.5 align-middle";
 
 export default function Wallet() {
   // ── Setup flow
@@ -327,11 +137,11 @@ export default function Wallet() {
   // ── Screen gates
   if (!ready) {
     return (
-      <div style={S.root}>
-        <div style={S.card}>
-          <h1 style={S.h1}>Unlink Wallet</h1>
+      <div className="min-h-screen bg-[#1a1a1a] text-[#e0e0e0] font-mono flex flex-col items-center py-8 px-4">
+        <div className="bg-[#242424] border border-[#444] rounded-xl p-8 w-full max-w-[520px]">
+          <h1 className="m-0 mb-6 text-[1.4rem] text-white">Unlink Wallet</h1>
           <div>
-            <span style={S.spinner} />
+            <span className={spinner} />
             {status || "Initializing..."}
           </div>
         </div>
@@ -341,29 +151,29 @@ export default function Wallet() {
 
   if (!walletExists) {
     return (
-      <div style={S.root}>
-        <div style={S.card}>
-          <h1 style={S.h1}>Unlink Wallet</h1>
+      <div className="min-h-screen bg-[#1a1a1a] text-[#e0e0e0] font-mono flex flex-col items-center py-8 px-4">
+        <div className="bg-[#242424] border border-[#444] rounded-xl p-8 w-full max-w-[520px]">
+          <h1 className="m-0 mb-6 text-[1.4rem] text-white">Unlink Wallet</h1>
           {error && (
-            <div style={S.error}>
+            <div className={errorBox}>
               {String(error)}
-              <button style={{ ...S.link, marginLeft: 8 }} onClick={clearError}>
+              <button className={`${linkBtn} ml-2`} onClick={clearError}>
                 Dismiss
               </button>
             </div>
           )}
-          {busy && <div style={S.info}><span style={S.spinner} />{status}</div>}
+          {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
 
           {setupScreen === "choice" && (
             <>
-              <p style={{ color: "#aaa", marginBottom: "20px" }}>
+              <p className="text-[#aaa] mb-5">
                 No wallet found. Create a new one or import an existing wallet.
               </p>
-              <button style={S.btn} onClick={handleCreateWallet} disabled={busy}>
+              <button className={btn} onClick={handleCreateWallet} disabled={busy}>
                 Create Wallet
               </button>
               <br />
-              <button style={S.link} onClick={() => setSetupScreen("import")}>
+              <button className={linkBtn} onClick={() => setSetupScreen("import")}>
                 Import existing wallet
               </button>
             </>
@@ -371,12 +181,12 @@ export default function Wallet() {
 
           {setupScreen === "backup" && (
             <>
-              <h2 style={S.h2}>Back up your recovery phrase</h2>
-              <div style={S.warning}>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Back up your recovery phrase</h2>
+              <div className={warningBox}>
                 Write these words down and store them somewhere safe. Anyone with this phrase can access your funds.
               </div>
-              <div style={S.mono}>{newMnemonic}</div>
-              <button style={S.btn} onClick={handleConfirmBackup} disabled={busy}>
+              <div className={monoBox}>{newMnemonic}</div>
+              <button className={btn} onClick={handleConfirmBackup} disabled={busy}>
                 I've backed it up — continue
               </button>
             </>
@@ -384,19 +194,19 @@ export default function Wallet() {
 
           {setupScreen === "import" && (
             <>
-              <h2 style={S.h2}>Import wallet</h2>
-              <label style={S.label}>Recovery phrase (12 or 24 words)</label>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Import wallet</h2>
+              <label className={labelCls}>Recovery phrase (12 or 24 words)</label>
               <textarea
-                style={S.textarea}
+                className="w-full bg-[#1a1a1a] border border-[#444] rounded-md text-[#e0e0e0] px-2.5 py-2 text-[0.85rem] font-mono box-border outline-none resize-y min-h-[80px] mb-3"
                 value={importInput}
                 onChange={(e) => setImportInput(e.target.value)}
                 placeholder="word1 word2 word3 ..."
                 rows={4}
               />
-              <button style={S.btn} onClick={handleImportWallet} disabled={busy || !importInput.trim()}>
+              <button className={btn} onClick={handleImportWallet} disabled={busy || !importInput.trim()}>
                 Import
               </button>
-              <button style={S.link} onClick={() => setSetupScreen("choice")}>
+              <button className={linkBtn} onClick={() => setSetupScreen("choice")}>
                 Back
               </button>
             </>
@@ -408,12 +218,12 @@ export default function Wallet() {
 
   if (!activeAccount) {
     return (
-      <div style={S.root}>
-        <div style={S.card}>
-          <h1 style={S.h1}>Unlink Wallet</h1>
-          {busy && <div style={S.info}><span style={S.spinner} />{status}</div>}
-          <p style={{ color: "#aaa" }}>Your wallet is ready. Create your first account to get started.</p>
-          <button style={S.btn} onClick={() => createAccount()} disabled={busy}>
+      <div className="min-h-screen bg-[#1a1a1a] text-[#e0e0e0] font-mono flex flex-col items-center py-8 px-4">
+        <div className="bg-[#242424] border border-[#444] rounded-xl p-8 w-full max-w-[520px]">
+          <h1 className="m-0 mb-6 text-[1.4rem] text-white">Unlink Wallet</h1>
+          {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
+          <p className="text-[#aaa]">Your wallet is ready. Create your first account to get started.</p>
+          <button className={btn} onClick={() => createAccount()} disabled={busy}>
             Create Account
           </button>
         </div>
@@ -430,28 +240,31 @@ export default function Wallet() {
     (pendingWithdrawals?.length ?? 0) > 0;
 
   return (
-    <div style={S.root}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={S.card}>
-        <h1 style={S.h1}>Unlink Wallet</h1>
+    <div className="min-h-screen bg-[#1a1a1a] text-[#e0e0e0] font-mono flex flex-col items-center py-8 px-4">
+      <div className="bg-[#242424] border border-[#444] rounded-xl p-8 w-full max-w-[520px]">
+        <h1 className="m-0 mb-6 text-[1.4rem] text-white">Unlink Wallet</h1>
 
         {/* Global error */}
         {error && (
-          <div style={S.error}>
+          <div className={errorBox}>
             {String(error)}
-            <button style={{ ...S.link, marginLeft: 8 }} onClick={clearError}>
+            <button className={`${linkBtn} ml-2`} onClick={clearError}>
               Dismiss
             </button>
           </div>
         )}
 
         {/* Busy indicator */}
-        {busy && <div style={S.info}><span style={S.spinner} />{status}</div>}
+        {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
 
         {/* Tab bar */}
-        <div style={S.tabBar}>
+        <div className="flex border-b border-[#444] mb-5 gap-0.5 flex-wrap">
           {(["overview", "send", "history", "accounts", "settings"] as const).map((t) => (
-            <button key={t} style={S.tab(activeTab === t)} onClick={() => setActiveTab(t)}>
+            <button
+              key={t}
+              className={`bg-transparent border-none border-b-2 ${activeTab === t ? "border-b-[#646cff] text-[#646cff]" : "border-b-transparent text-[#888]"} px-3.5 py-2 cursor-pointer text-[0.85rem] -mb-px`}
+              onClick={() => setActiveTab(t)}
+            >
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -460,19 +273,19 @@ export default function Wallet() {
         {/* ── Overview tab */}
         {activeTab === "overview" && (
           <div>
-            <div style={S.section}>
-              <label style={S.label}>Active address</label>
-              <div style={S.mono}>{activeAccount.address}</div>
+            <div className={sectionCls}>
+              <label className={labelCls}>Active address</label>
+              <div className={monoBox}>{activeAccount.address}</div>
             </div>
 
-            <div style={S.section}>
-              <label style={S.label}>Balances</label>
+            <div className={sectionCls}>
+              <label className={labelCls}>Balances</label>
               {Object.keys(balances).length === 0 ? (
-                <p style={{ color: "#666", fontSize: "0.85rem" }}>No balances yet</p>
+                <p className="text-[#666] text-[0.85rem]">No balances yet</p>
               ) : (
                 Object.entries(balances).map(([token, bal]) => (
-                  <div key={token} style={S.row}>
-                    <span style={{ fontSize: "0.8rem", color: "#888" }}>{shortenHex(token, 6)}</span>
+                  <div key={token} className={rowCls}>
+                    <span className="text-[0.8rem] text-[#888]">{shortenHex(token, 6)}</span>
                     <span>{formatAmount(bal, 18)}</span>
                   </div>
                 ))
@@ -480,33 +293,33 @@ export default function Wallet() {
             </div>
 
             {hasPending && (
-              <div style={S.section}>
-                <label style={S.label}>Pending operations</label>
+              <div className={sectionCls}>
+                <label className={labelCls}>Pending operations</label>
                 {(pendingSends ?? []).map((p: any, i: number) => (
-                  <div key={i} style={S.row}>
-                    <span style={S.badge("#646cff")}>send</span>
-                    <span style={{ fontSize: "0.8rem", color: "#aaa" }}>{JSON.stringify(p)}</span>
+                  <div key={i} className={rowCls}>
+                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#646cff" }}>send</span>
+                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
                   </div>
                 ))}
                 {(pendingDeposits ?? []).map((p: any, i: number) => (
-                  <div key={i} style={S.row}>
-                    <span style={S.badge("#1e7e34")}>deposit</span>
-                    <span style={{ fontSize: "0.8rem", color: "#aaa" }}>{JSON.stringify(p)}</span>
+                  <div key={i} className={rowCls}>
+                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#1e7e34" }}>deposit</span>
+                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
                   </div>
                 ))}
                 {(pendingWithdrawals ?? []).map((p: any, i: number) => (
-                  <div key={i} style={S.row}>
-                    <span style={S.badge("#856404")}>withdrawal</span>
-                    <span style={{ fontSize: "0.8rem", color: "#aaa" }}>{JSON.stringify(p)}</span>
+                  <div key={i} className={rowCls}>
+                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#856404" }}>withdrawal</span>
+                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            <button style={S.btn} onClick={() => refresh()} disabled={busy}>
+            <button className={btn} onClick={() => refresh()} disabled={busy}>
               Refresh
             </button>
-            <button style={S.btnGhost} onClick={() => forceResync()} disabled={busy}>
+            <button className={btnGhost} onClick={() => forceResync()} disabled={busy}>
               Force Resync
             </button>
           </div>
@@ -515,10 +328,10 @@ export default function Wallet() {
         {/* ── Send tab */}
         {activeTab === "send" && (
           <div>
-            <div style={S.section}>
-              <label style={S.label}>Token</label>
+            <div className={sectionCls}>
+              <label className={labelCls}>Token</label>
               <select
-                style={S.select}
+                className={inputCls}
                 value={sendToken}
                 onChange={(e) => setSendToken(e.target.value)}
               >
@@ -527,33 +340,33 @@ export default function Wallet() {
               </select>
               {sendToken === "custom" && (
                 <input
-                  style={S.input}
+                  className={inputCls}
                   value={sendTokenCustom}
                   onChange={(e) => setSendTokenCustom(e.target.value)}
                   placeholder="0x..."
                 />
               )}
               {selectedBalance !== undefined && (
-                <div style={{ fontSize: "0.8rem", color: "#aaa", marginBottom: "8px" }}>
+                <div className="text-[0.8rem] text-[#aaa] mb-2">
                   Available: {formatAmount(selectedBalance, 18)}
                 </div>
               )}
             </div>
 
-            <div style={S.section}>
-              <label style={S.label}>Recipient</label>
+            <div className={sectionCls}>
+              <label className={labelCls}>Recipient</label>
               <input
-                style={S.input}
+                className={inputCls}
                 value={sendRecipient}
                 onChange={(e) => setSendRecipient(e.target.value)}
                 placeholder="unlink1... or 0x..."
               />
             </div>
 
-            <div style={S.section}>
-              <label style={S.label}>Amount</label>
+            <div className={sectionCls}>
+              <label className={labelCls}>Amount</label>
               <input
-                style={S.input}
+                className={inputCls}
                 value={sendAmount}
                 onChange={(e) => setSendAmount(e.target.value)}
                 placeholder="0.0"
@@ -563,7 +376,7 @@ export default function Wallet() {
             </div>
 
             <button
-              style={{ ...S.btn, opacity: sendPending || busy || !sendAmount || !sendRecipient ? 0.5 : 1 }}
+              className={`${btn} disabled:opacity-50`}
               onClick={handleSend}
               disabled={sendPending || busy || !sendAmount || !sendRecipient}
             >
@@ -571,24 +384,27 @@ export default function Wallet() {
             </button>
 
             {sendError && (
-              <div style={{ ...S.error, marginTop: "12px" }}>
+              <div className={`${errorBox} mt-3`}>
                 {String(sendError)}
               </div>
             )}
 
             {lastRelayId && (
-              <div style={{ ...S.info, marginTop: "12px" }}>
+              <div className={`${infoBox} mt-3`}>
                 <div><strong>Relay ID:</strong> {shortenHex(lastRelayId, 8)}</div>
                 {txStatus && (
                   <>
                     <div>
                       <strong>Status:</strong>{" "}
-                      <span style={S.badge(badgeColor(txStatus.state ?? ""))}>
+                      <span
+                        className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                        style={{ background: badgeColor(txStatus.state ?? "") }}
+                      >
                         {txStatus.state}
                       </span>
                     </div>
                     {txStatus.txHash && (
-                      <div style={{ marginTop: "4px" }}>
+                      <div className="mt-1">
                         <strong>Tx:</strong> {shortenHex(txStatus.txHash, 8)}
                       </div>
                     )}
@@ -602,43 +418,56 @@ export default function Wallet() {
         {/* ── History tab */}
         {activeTab === "history" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <span style={{ color: "#aaa", fontSize: "0.85rem" }}>Transaction history</span>
-              <button style={S.btnSm} onClick={() => refreshHistory()}>
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-[#aaa] text-[0.85rem]">Transaction history</span>
+              <button className={btnSm} onClick={() => refreshHistory()}>
                 Refresh
               </button>
             </div>
 
             {historyLoading && (
-              <div style={{ color: "#888" }}><span style={S.spinner} />Loading…</div>
+              <div className="text-[#888]"><span className={spinner} />Loading…</div>
             )}
 
             {historyError && (
-              <div style={S.error}>{String(historyError)}</div>
+              <div className={errorBox}>{String(historyError)}</div>
             )}
 
             {!historyLoading && !historyError && (!history || history.length === 0) && (
-              <p style={{ color: "#666", fontSize: "0.85rem" }}>No transactions yet.</p>
+              <p className="text-[#666] text-[0.85rem]">No transactions yet.</p>
             )}
 
             {(history ?? []).map((entry: any) => (
-              <div key={entry.id} style={{ ...S.row, flexDirection: "column", alignItems: "flex-start", gap: "4px" }}>
+              <div key={entry.id} className={`${rowCls} flex-col items-start gap-1`}>
                 <div>
-                  <span style={S.badge(kindColor(entry.kind))}>{entry.kind}</span>
-                  <span style={S.badge(badgeColor(entry.status))}>{entry.status}</span>
+                  <span
+                    className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                    style={{ background: kindColor(entry.kind) }}
+                  >
+                    {entry.kind}
+                  </span>
+                  <span
+                    className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                    style={{ background: badgeColor(entry.status) }}
+                  >
+                    {entry.status}
+                  </span>
                   {entry.txHash && (
-                    <span style={{ fontSize: "0.78rem", color: "#888" }}>
+                    <span className="text-[0.78rem] text-[#888]">
                       {shortenHex(entry.txHash, 8)}
                     </span>
                   )}
                 </div>
                 {(entry.amounts ?? []).map((a: any, i: number) => (
-                  <div key={i} style={{ fontSize: "0.82rem", color: Number(a.delta) < 0 ? "#ff8080" : "#80ff80" }}>
+                  <div
+                    key={i}
+                    className={`text-[0.82rem] ${Number(a.delta) < 0 ? "text-[#ff8080]" : "text-[#80ff80]"}`}
+                  >
                     {a.delta} {shortenHex(a.token, 6)}
                   </div>
                 ))}
                 {entry.timestamp && (
-                  <div style={{ fontSize: "0.75rem", color: "#666" }}>
+                  <div className="text-[0.75rem] text-[#666]">
                     {new Date(entry.timestamp).toLocaleString()}
                   </div>
                 )}
@@ -651,15 +480,15 @@ export default function Wallet() {
         {activeTab === "accounts" && (
           <div>
             {(accounts ?? []).map((acc: any, i: number) => (
-              <div key={i} style={S.row}>
+              <div key={i} className={rowCls}>
                 <div>
-                  <div style={{ fontSize: "0.85rem", color: i === activeAccountIndex ? "#646cff" : "#ccc" }}>
+                  <div className={`text-[0.85rem] ${i === activeAccountIndex ? "text-[#646cff]" : "text-[#ccc]"}`}>
                     Account #{i} {i === activeAccountIndex && "(active)"}
                   </div>
-                  <div style={{ fontSize: "0.78rem", color: "#888" }}>{shortenHex(acc.address, 6)}</div>
+                  <div className="text-[0.78rem] text-[#888]">{shortenHex(acc.address, 6)}</div>
                 </div>
                 <button
-                  style={i === activeAccountIndex ? S.btnSmGhost : S.btnSm}
+                  className={i === activeAccountIndex ? btnSmGhost : btnSm}
                   onClick={() => switchAccount(i)}
                   disabled={i === activeAccountIndex || busy}
                 >
@@ -667,8 +496,8 @@ export default function Wallet() {
                 </button>
               </div>
             ))}
-            <div style={{ marginTop: "16px" }}>
-              <button style={S.btn} onClick={() => createAccount()} disabled={busy}>
+            <div className="mt-4">
+              <button className={btn} onClick={() => createAccount()} disabled={busy}>
                 Create Account
               </button>
             </div>
@@ -678,39 +507,39 @@ export default function Wallet() {
         {/* ── Settings tab */}
         {activeTab === "settings" && (
           <div>
-            <div style={S.section}>
-              <h2 style={S.h2}>Export recovery phrase</h2>
-              <button style={S.btn} onClick={handleExportMnemonic} disabled={busy}>
+            <div className={sectionCls}>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Export recovery phrase</h2>
+              <button className={btn} onClick={handleExportMnemonic} disabled={busy}>
                 Show recovery phrase
               </button>
               {exportedMnemonic && (
                 <>
-                  <div style={{ ...S.warning, marginTop: "8px" }}>
+                  <div className={`${warningBox} mt-2`}>
                     Keep this private. Anyone with this phrase controls your wallet.
                   </div>
-                  <div style={S.mono}>{exportedMnemonic}</div>
-                  <button style={S.btnGhost} onClick={() => setExportedMnemonic("")}>
+                  <div className={monoBox}>{exportedMnemonic}</div>
+                  <button className={btnGhost} onClick={() => setExportedMnemonic("")}>
                     Hide
                   </button>
                 </>
               )}
             </div>
 
-            <div style={{ ...S.section, borderTop: "1px solid #3a1a1a", paddingTop: "20px" }}>
-              <h2 style={{ ...S.h2, color: "#ff8080" }}>Danger zone</h2>
+            <div className={`${sectionCls} border-t border-[#3a1a1a] pt-5`}>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ff8080]">Danger zone</h2>
               {!confirmClear ? (
-                <button style={S.btnDanger} onClick={() => setConfirmClear(true)}>
+                <button className={btnDanger} onClick={() => setConfirmClear(true)}>
                   Clear Wallet
                 </button>
               ) : (
                 <div>
-                  <div style={S.warning}>
+                  <div className={warningBox}>
                     This will permanently delete your wallet from this device. Make sure you have your recovery phrase.
                   </div>
-                  <button style={S.btnDanger} onClick={() => { clearWallet(); setConfirmClear(false); }}>
+                  <button className={btnDanger} onClick={() => { clearWallet(); setConfirmClear(false); }}>
                     Yes, clear wallet
                   </button>
-                  <button style={S.btnGhost} onClick={() => setConfirmClear(false)}>
+                  <button className={btnGhost} onClick={() => setConfirmClear(false)}>
                     Cancel
                   </button>
                 </div>
