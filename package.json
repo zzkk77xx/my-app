@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@unlink-xyz/core": "^0.1.8",
-    "@unlink-xyz/react": "^0.1.8",
+    "@unlink-xyz/core": "0.1.7-canary.4b89772",
+    "@unlink-xyz/react": "0.1.7-canary.4b89772",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
