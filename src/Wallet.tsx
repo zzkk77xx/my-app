@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useUnlink,
   useUnlinkHistory,
@@ -11,6 +11,7 @@ import {
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 function badgeColor(s: string) {
   if (s === "confirmed" || s === "success") return "#1e7e34";
@@ -26,30 +27,46 @@ function kindColor(k: string) {
   return "#444";
 }
 
-const btn = "bg-[#646cff] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2 disabled:opacity-50";
-const btnDanger = "bg-[#c0392b] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
-const btnGhost = "bg-transparent border border-[#444] rounded-md text-[#aaa] px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
-const btnSm = "bg-[#646cff] border-none rounded text-white px-2.5 py-1 text-[0.8rem] cursor-pointer";
-const btnSmGhost = "bg-transparent border border-[#444] rounded text-[#aaa] px-2.5 py-1 text-[0.8rem] cursor-pointer";
-const linkBtn = "bg-transparent border-none text-[#646cff] cursor-pointer text-sm p-0 underline";
-const inputCls = "w-full bg-[#1a1a1a] border border-[#444] rounded-md text-[#e0e0e0] px-2.5 py-2 text-sm box-border outline-none mb-3";
-const monoBox = "bg-[#111] border border-[#333] rounded-md px-3.5 py-2.5 text-[0.82rem] break-all mb-3 text-[#b0ffb0] font-mono";
-const errorBox = "bg-[#3a1a1a] border border-[#c0392b] rounded-md px-3.5 py-2.5 text-[#ff8080] text-sm mb-3";
-const warningBox = "bg-[#2a2000] border border-[#a08000] rounded-md px-3.5 py-2.5 text-[#ffd060] text-sm mb-3";
-const infoBox = "bg-[#1a2a3a] border border-[#3a6a9a] rounded-md px-3.5 py-2.5 text-[#80c0ff] text-sm mb-3";
+const btn =
+  "bg-[#646cff] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2 disabled:opacity-50";
+const btnDanger =
+  "bg-[#c0392b] border-none rounded-md text-white px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
+const btnGhost =
+  "bg-transparent border border-[#444] rounded-md text-[#aaa] px-5 py-2.5 text-sm cursor-pointer mr-2 mb-2";
+const btnSm =
+  "bg-[#646cff] border-none rounded text-white px-2.5 py-1 text-[0.8rem] cursor-pointer";
+const btnSmGhost =
+  "bg-transparent border border-[#444] rounded text-[#aaa] px-2.5 py-1 text-[0.8rem] cursor-pointer";
+const linkBtn =
+  "bg-transparent border-none text-[#646cff] cursor-pointer text-sm p-0 underline";
+const inputCls =
+  "w-full bg-[#1a1a1a] border border-[#444] rounded-md text-[#e0e0e0] px-2.5 py-2 text-sm box-border outline-none mb-3";
+const monoBox =
+  "bg-[#111] border border-[#333] rounded-md px-3.5 py-2.5 text-[0.82rem] break-all mb-3 text-[#b0ffb0] font-mono";
+const errorBox =
+  "bg-[#3a1a1a] border border-[#c0392b] rounded-md px-3.5 py-2.5 text-[#ff8080] text-sm mb-3";
+const warningBox =
+  "bg-[#2a2000] border border-[#a08000] rounded-md px-3.5 py-2.5 text-[#ffd060] text-sm mb-3";
+const infoBox =
+  "bg-[#1a2a3a] border border-[#3a6a9a] rounded-md px-3.5 py-2.5 text-[#80c0ff] text-sm mb-3";
 const labelCls = "block mb-1.5 text-[0.8rem] text-[#aaa]";
 const rowCls = "flex items-center justify-between py-2 border-b border-[#333]";
 const sectionCls = "mb-5";
-const spinner = "inline-block w-[18px] h-[18px] border-2 border-[#444] border-t-[#646cff] rounded-full animate-spin mr-2.5 align-middle";
+const spinner =
+  "inline-block w-[18px] h-[18px] border-2 border-[#444] border-t-[#646cff] rounded-full animate-spin mr-2.5 align-middle";
 
 export default function Wallet() {
   // ── Setup flow
-  const [setupScreen, setSetupScreen] = useState<"choice" | "backup" | "import">("choice");
+  const [setupScreen, setSetupScreen] = useState<
+    "choice" | "backup" | "import"
+  >("choice");
   const [newMnemonic, setNewMnemonic] = useState("");
   const [importInput, setImportInput] = useState("");
 
   // ── Main nav
-  const [activeTab, setActiveTab] = useState<"overview" | "send" | "history" | "accounts" | "settings">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "send" | "history" | "accounts" | "settings"
+  >("overview");
 
   // ── Send form
   const [sendToken, setSendToken] = useState(NATIVE_TOKEN);
@@ -63,9 +80,35 @@ export default function Wallet() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   // ── Privy (unconditional)
-  const { ready: privyReady, authenticated, login, logout } = usePrivy();
+  const { ready: privyReady, authenticated, login, logout, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   const externalWallet = wallets[0];
+
+  // Only surface the address once both `authenticated` and the wallet address
+  // are settled — clears immediately on logout so stale addresses never linger.
+  const [confirmedAddress, setConfirmedAddress] = useState<string | null>(null);
+  useEffect(() => {
+    if (!authenticated) {
+      setConfirmedAddress(null);
+    } else if (authenticated && externalWallet?.address) {
+      setConfirmedAddress(externalWallet.address);
+    }
+  }, [authenticated, externalWallet?.address]);
+
+  // Register user with backend on first login (idempotent — safe to call every time)
+  useEffect(() => {
+    if (!authenticated || !externalWallet?.address) return;
+    getAccessToken().then((token) => {
+      fetch(`${API_URL}/users/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ address: externalWallet.address }),
+      }).catch((err) => console.error("[register] failed:", err));
+    });
+  }, [authenticated, externalWallet?.address]);
 
   // ── Hooks (unconditional)
   const {
@@ -99,7 +142,12 @@ export default function Wallet() {
     refresh: refreshHistory,
   } = useUnlinkHistory();
 
-  const { send, isPending: sendPending, error: sendError, reset: resetSend } = useSend();
+  const {
+    send,
+    isPending: sendPending,
+    error: sendError,
+    reset: resetSend,
+  } = useSend();
 
   const txStatus = useTxStatus(lastRelayId);
 
@@ -168,31 +216,49 @@ export default function Wallet() {
               </button>
             </div>
           )}
-          {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
+          {busy && (
+            <div className={infoBox}>
+              <span className={spinner} />
+              {status}
+            </div>
+          )}
 
           {setupScreen === "choice" && (
             <>
               <p className="text-[#aaa] mb-5">
                 No wallet found. Create a new one or import an existing wallet.
               </p>
-              <button className={btn} onClick={handleCreateWallet} disabled={busy}>
+              <button
+                className={btn}
+                onClick={handleCreateWallet}
+                disabled={busy}
+              >
                 Create Wallet
               </button>
               <br />
-              <button className={linkBtn} onClick={() => setSetupScreen("import")}>
+              <button
+                className={linkBtn}
+                onClick={() => setSetupScreen("import")}
+              >
                 Import existing wallet
               </button>
 
               <div className="border-t border-[#333] mt-5 pt-5">
-                <p className="text-[#888] text-[0.8rem] mb-3">Or connect an external wallet</p>
+                <p className="text-[#888] text-[0.8rem] mb-3">
+                  Or connect an external wallet
+                </p>
                 {!privyReady ? (
-                  <button className={btnGhost} disabled>Loading…</button>
-                ) : authenticated && externalWallet ? (
+                  <button className={btnGhost} disabled>
+                    Loading…
+                  </button>
+                ) : confirmedAddress ? (
                   <div className={infoBox}>
                     <div className="text-[0.8rem] mb-2">
-                      Connected: {shortenHex(externalWallet.address, 6)}
+                      Connected: {shortenHex(confirmedAddress, 6)}
                     </div>
-                    <button className={btnGhost} onClick={logout}>Disconnect</button>
+                    <button className={btnGhost} onClick={logout}>
+                      Disconnect
+                    </button>
                   </div>
                 ) : (
                   <button className={btnGhost} onClick={login}>
@@ -205,12 +271,19 @@ export default function Wallet() {
 
           {setupScreen === "backup" && (
             <>
-              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Back up your recovery phrase</h2>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">
+                Back up your recovery phrase
+              </h2>
               <div className={warningBox}>
-                Write these words down and store them somewhere safe. Anyone with this phrase can access your funds.
+                Write these words down and store them somewhere safe. Anyone
+                with this phrase can access your funds.
               </div>
               <div className={monoBox}>{newMnemonic}</div>
-              <button className={btn} onClick={handleConfirmBackup} disabled={busy}>
+              <button
+                className={btn}
+                onClick={handleConfirmBackup}
+                disabled={busy}
+              >
                 I've backed it up — continue
               </button>
             </>
@@ -218,8 +291,12 @@ export default function Wallet() {
 
           {setupScreen === "import" && (
             <>
-              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Import wallet</h2>
-              <label className={labelCls}>Recovery phrase (12 or 24 words)</label>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">
+                Import wallet
+              </h2>
+              <label className={labelCls}>
+                Recovery phrase (12 or 24 words)
+              </label>
               <textarea
                 className="w-full bg-[#1a1a1a] border border-[#444] rounded-md text-[#e0e0e0] px-2.5 py-2 text-[0.85rem] font-mono box-border outline-none resize-y min-h-[80px] mb-3"
                 value={importInput}
@@ -227,10 +304,17 @@ export default function Wallet() {
                 placeholder="word1 word2 word3 ..."
                 rows={4}
               />
-              <button className={btn} onClick={handleImportWallet} disabled={busy || !importInput.trim()}>
+              <button
+                className={btn}
+                onClick={handleImportWallet}
+                disabled={busy || !importInput.trim()}
+              >
                 Import
               </button>
-              <button className={linkBtn} onClick={() => setSetupScreen("choice")}>
+              <button
+                className={linkBtn}
+                onClick={() => setSetupScreen("choice")}
+              >
                 Back
               </button>
             </>
@@ -245,9 +329,20 @@ export default function Wallet() {
       <div className="min-h-screen bg-[#1a1a1a] text-[#e0e0e0] font-mono flex flex-col items-center py-8 px-4">
         <div className="bg-[#242424] border border-[#444] rounded-xl p-8 w-full max-w-[520px]">
           <h1 className="m-0 mb-6 text-[1.4rem] text-white">Unlink Wallet</h1>
-          {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
-          <p className="text-[#aaa]">Your wallet is ready. Create your first account to get started.</p>
-          <button className={btn} onClick={() => createAccount()} disabled={busy}>
+          {busy && (
+            <div className={infoBox}>
+              <span className={spinner} />
+              {status}
+            </div>
+          )}
+          <p className="text-[#aaa]">
+            Your wallet is ready. Create your first account to get started.
+          </p>
+          <button
+            className={btn}
+            onClick={() => createAccount()}
+            disabled={busy}
+          >
             Create Account
           </button>
         </div>
@@ -256,7 +351,8 @@ export default function Wallet() {
   }
 
   // ── Main wallet view
-  const effectiveToken = sendToken === "custom" ? sendTokenCustom.trim() : sendToken;
+  const effectiveToken =
+    sendToken === "custom" ? sendTokenCustom.trim() : sendToken;
   const selectedBalance = balances[effectiveToken];
   const hasPending =
     (pendingSends?.length ?? 0) > 0 ||
@@ -279,11 +375,18 @@ export default function Wallet() {
         )}
 
         {/* Busy indicator */}
-        {busy && <div className={infoBox}><span className={spinner} />{status}</div>}
+        {busy && (
+          <div className={infoBox}>
+            <span className={spinner} />
+            {status}
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex border-b border-[#444] mb-5 gap-0.5 flex-wrap">
-          {(["overview", "send", "history", "accounts", "settings"] as const).map((t) => (
+          {(
+            ["overview", "send", "history", "accounts", "settings"] as const
+          ).map((t) => (
             <button
               key={t}
               className={`bg-transparent border-none border-b-2 ${activeTab === t ? "border-b-[#646cff] text-[#646cff]" : "border-b-transparent text-[#888]"} px-3.5 py-2 cursor-pointer text-[0.85rem] -mb-px`}
@@ -309,7 +412,9 @@ export default function Wallet() {
               ) : (
                 Object.entries(balances).map(([token, bal]) => (
                   <div key={token} className={rowCls}>
-                    <span className="text-[0.8rem] text-[#888]">{shortenHex(token, 6)}</span>
+                    <span className="text-[0.8rem] text-[#888]">
+                      {shortenHex(token, 6)}
+                    </span>
                     <span>{formatAmount(bal, 18)}</span>
                   </div>
                 ))
@@ -321,20 +426,41 @@ export default function Wallet() {
                 <label className={labelCls}>Pending operations</label>
                 {(pendingSends ?? []).map((p: any, i: number) => (
                   <div key={i} className={rowCls}>
-                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#646cff" }}>send</span>
-                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
+                    <span
+                      className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                      style={{ background: "#646cff" }}
+                    >
+                      send
+                    </span>
+                    <span className="text-[0.8rem] text-[#aaa]">
+                      {JSON.stringify(p)}
+                    </span>
                   </div>
                 ))}
                 {(pendingDeposits ?? []).map((p: any, i: number) => (
                   <div key={i} className={rowCls}>
-                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#1e7e34" }}>deposit</span>
-                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
+                    <span
+                      className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                      style={{ background: "#1e7e34" }}
+                    >
+                      deposit
+                    </span>
+                    <span className="text-[0.8rem] text-[#aaa]">
+                      {JSON.stringify(p)}
+                    </span>
                   </div>
                 ))}
                 {(pendingWithdrawals ?? []).map((p: any, i: number) => (
                   <div key={i} className={rowCls}>
-                    <span className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5" style={{ background: "#856404" }}>withdrawal</span>
-                    <span className="text-[0.8rem] text-[#aaa]">{JSON.stringify(p)}</span>
+                    <span
+                      className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
+                      style={{ background: "#856404" }}
+                    >
+                      withdrawal
+                    </span>
+                    <span className="text-[0.8rem] text-[#aaa]">
+                      {JSON.stringify(p)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -344,20 +470,30 @@ export default function Wallet() {
               <label className={labelCls}>External wallet</label>
               {!privyReady ? (
                 <p className="text-[#666] text-[0.85rem]">Loading…</p>
-              ) : authenticated && externalWallet ? (
+              ) : confirmedAddress ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-[0.85rem] text-[#e0e0e0]">{shortenHex(externalWallet.address, 8)}</span>
-                  <button className={btnSmGhost} onClick={logout}>Disconnect</button>
+                  <span className="text-[0.85rem] text-[#e0e0e0]">
+                    {shortenHex(confirmedAddress, 8)}
+                  </span>
+                  <button className={btnSmGhost} onClick={logout}>
+                    Disconnect
+                  </button>
                 </div>
               ) : (
-                <button className={btnGhost} onClick={login}>Connect Wallet</button>
+                <button className={btnGhost} onClick={login}>
+                  Connect Wallet
+                </button>
               )}
             </div>
 
             <button className={btn} onClick={() => refresh()} disabled={busy}>
               Refresh
             </button>
-            <button className={btnGhost} onClick={() => forceResync()} disabled={busy}>
+            <button
+              className={btnGhost}
+              onClick={() => forceResync()}
+              disabled={busy}
+            >
               Force Resync
             </button>
           </div>
@@ -373,7 +509,9 @@ export default function Wallet() {
                 value={sendToken}
                 onChange={(e) => setSendToken(e.target.value)}
               >
-                <option value={NATIVE_TOKEN}>Native ETH ({shortenHex(NATIVE_TOKEN, 6)})</option>
+                <option value={NATIVE_TOKEN}>
+                  Native ETH ({shortenHex(NATIVE_TOKEN, 6)})
+                </option>
                 <option value="custom">Custom token address…</option>
               </select>
               {sendToken === "custom" && (
@@ -422,14 +560,14 @@ export default function Wallet() {
             </button>
 
             {sendError && (
-              <div className={`${errorBox} mt-3`}>
-                {String(sendError)}
-              </div>
+              <div className={`${errorBox} mt-3`}>{String(sendError)}</div>
             )}
 
             {lastRelayId && (
               <div className={`${infoBox} mt-3`}>
-                <div><strong>Relay ID:</strong> {shortenHex(lastRelayId, 8)}</div>
+                <div>
+                  <strong>Relay ID:</strong> {shortenHex(lastRelayId, 8)}
+                </div>
                 {txStatus && (
                   <>
                     <div>
@@ -457,26 +595,38 @@ export default function Wallet() {
         {activeTab === "history" && (
           <div>
             <div className="flex justify-between items-center mb-3">
-              <span className="text-[#aaa] text-[0.85rem]">Transaction history</span>
+              <span className="text-[#aaa] text-[0.85rem]">
+                Transaction history
+              </span>
               <button className={btnSm} onClick={() => refreshHistory()}>
                 Refresh
               </button>
             </div>
 
             {historyLoading && (
-              <div className="text-[#888]"><span className={spinner} />Loading…</div>
+              <div className="text-[#888]">
+                <span className={spinner} />
+                Loading…
+              </div>
             )}
 
             {historyError && (
               <div className={errorBox}>{String(historyError)}</div>
             )}
 
-            {!historyLoading && !historyError && (!history || history.length === 0) && (
-              <p className="text-[#666] text-[0.85rem]">No transactions yet.</p>
-            )}
+            {!historyLoading &&
+              !historyError &&
+              (!history || history.length === 0) && (
+                <p className="text-[#666] text-[0.85rem]">
+                  No transactions yet.
+                </p>
+              )}
 
             {(history ?? []).map((entry: any) => (
-              <div key={entry.id} className={`${rowCls} flex-col items-start gap-1`}>
+              <div
+                key={entry.id}
+                className={`${rowCls} flex-col items-start gap-1`}
+              >
                 <div>
                   <span
                     className="inline-block text-white rounded px-1.5 py-0.5 text-[0.75rem] mr-1.5"
@@ -520,10 +670,14 @@ export default function Wallet() {
             {(accounts ?? []).map((acc: any, i: number) => (
               <div key={i} className={rowCls}>
                 <div>
-                  <div className={`text-[0.85rem] ${i === activeAccountIndex ? "text-[#646cff]" : "text-[#ccc]"}`}>
+                  <div
+                    className={`text-[0.85rem] ${i === activeAccountIndex ? "text-[#646cff]" : "text-[#ccc]"}`}
+                  >
                     Account #{i} {i === activeAccountIndex && "(active)"}
                   </div>
-                  <div className="text-[0.78rem] text-[#888]">{shortenHex(acc.address, 6)}</div>
+                  <div className="text-[0.78rem] text-[#888]">
+                    {shortenHex(acc.address, 6)}
+                  </div>
                 </div>
                 <button
                   className={i === activeAccountIndex ? btnSmGhost : btnSm}
@@ -535,7 +689,11 @@ export default function Wallet() {
               </div>
             ))}
             <div className="mt-4">
-              <button className={btn} onClick={() => createAccount()} disabled={busy}>
+              <button
+                className={btn}
+                onClick={() => createAccount()}
+                disabled={busy}
+              >
                 Create Account
               </button>
             </div>
@@ -546,17 +704,27 @@ export default function Wallet() {
         {activeTab === "settings" && (
           <div>
             <div className={sectionCls}>
-              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">Export recovery phrase</h2>
-              <button className={btn} onClick={handleExportMnemonic} disabled={busy}>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ccc]">
+                Export recovery phrase
+              </h2>
+              <button
+                className={btn}
+                onClick={handleExportMnemonic}
+                disabled={busy}
+              >
                 Show recovery phrase
               </button>
               {exportedMnemonic && (
                 <>
                   <div className={`${warningBox} mt-2`}>
-                    Keep this private. Anyone with this phrase controls your wallet.
+                    Keep this private. Anyone with this phrase controls your
+                    wallet.
                   </div>
                   <div className={monoBox}>{exportedMnemonic}</div>
-                  <button className={btnGhost} onClick={() => setExportedMnemonic("")}>
+                  <button
+                    className={btnGhost}
+                    onClick={() => setExportedMnemonic("")}
+                  >
                     Hide
                   </button>
                 </>
@@ -564,20 +732,35 @@ export default function Wallet() {
             </div>
 
             <div className={`${sectionCls} border-t border-[#3a1a1a] pt-5`}>
-              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ff8080]">Danger zone</h2>
+              <h2 className="m-0 mb-4 text-[1.1rem] text-[#ff8080]">
+                Danger zone
+              </h2>
               {!confirmClear ? (
-                <button className={btnDanger} onClick={() => setConfirmClear(true)}>
+                <button
+                  className={btnDanger}
+                  onClick={() => setConfirmClear(true)}
+                >
                   Clear Wallet
                 </button>
               ) : (
                 <div>
                   <div className={warningBox}>
-                    This will permanently delete your wallet from this device. Make sure you have your recovery phrase.
+                    This will permanently delete your wallet from this device.
+                    Make sure you have your recovery phrase.
                   </div>
-                  <button className={btnDanger} onClick={() => { clearWallet(); setConfirmClear(false); }}>
+                  <button
+                    className={btnDanger}
+                    onClick={() => {
+                      clearWallet();
+                      setConfirmClear(false);
+                    }}
+                  >
                     Yes, clear wallet
                   </button>
-                  <button className={btnGhost} onClick={() => setConfirmClear(false)}>
+                  <button
+                    className={btnGhost}
+                    onClick={() => setConfirmClear(false)}
+                  >
                     Cancel
                   </button>
                 </div>
