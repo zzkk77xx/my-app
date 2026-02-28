@@ -1,0 +1,23 @@
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Prevent caching of service worker
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Content-Security-Policy = "frame-ancestors 'none';"
+
+[[headers]]
+  for = "/widget*"
+  [headers.values]
+    X-Frame-Options = ""
+    Content-Security-Policy = "frame-ancestors *;"
