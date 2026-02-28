@@ -168,22 +168,6 @@ const Icon = {
       />
     </svg>
   ),
-  Refresh: () => (
-    <svg
-      width="18"
-      height="18"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
   Lock: () => (
     <svg
       width="14"
@@ -382,7 +366,10 @@ function TransferModal({
           recipient,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(b?.error ?? res.statusText);
+      }
       const { relayId: rid } = await res.json();
       setRelayId(rid);
       setAmount("");
@@ -888,6 +875,261 @@ function DepositModal({
   );
 }
 
+// --- Add New Card Modal ---
+function AddCardModal({
+  onClose,
+  onAdd,
+  registering,
+  error,
+}: {
+  onClose: () => void;
+  onAdd: (eoa: string, dailyLimit: string) => void;
+  registering: boolean;
+  error: string;
+}) {
+  const [eoa, setEoa] = useState("");
+  const [limit, setLimit] = useState(1000);
+  const [validationErr, setValidationErr] = useState("");
+
+  function handleSubmit() {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(eoa.trim())) {
+      setValidationErr("Enter a valid 0x wallet address (42 chars).");
+      return;
+    }
+    setValidationErr("");
+    onAdd(eoa.trim(), parseWei(limit.toString()));
+  }
+
+  async function handlePaste() {
+    try {
+      const text = await navigator.clipboard.readText();
+      setEoa(text.trim());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const displayErr = validationErr || error;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 100,
+        background: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(10px)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        style={{
+          background: C.card,
+          borderRadius: "24px 24px 0 0",
+          padding: "28px 24px 40px",
+          borderTop: `1px solid ${C.border}`,
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 26 }}>💳</span>
+            <span
+              style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}
+            >
+              Add New Card
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              border: "none",
+              color: C.textSecondary,
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              cursor: "pointer",
+              fontSize: 16,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* EOA address input */}
+        <label
+          style={{
+            color: C.textSecondary,
+            fontSize: 12,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            marginBottom: 6,
+            display: "block",
+          }}
+        >
+          Wallet / EOA Address
+        </label>
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <input
+            placeholder="0x..."
+            value={eoa}
+            onChange={(e) => {
+              setEoa(e.target.value);
+              setValidationErr("");
+            }}
+            style={{
+              width: "100%",
+              padding: "14px 52px 14px 16px",
+              background: C.bg,
+              border: `1px solid ${displayErr ? C.red : C.border}`,
+              borderRadius: 14,
+              color: C.textPrimary,
+              fontSize: 13,
+              fontFamily: "monospace",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={handlePaste}
+            title="Paste"
+            style={{
+              position: "absolute",
+              right: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: C.accentSoft,
+              border: "none",
+              borderRadius: 8,
+              color: C.accent,
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "4px 10px",
+              cursor: "pointer",
+            }}
+          >
+            Paste
+          </button>
+        </div>
+
+        {/* Daily limit presets */}
+        <label
+          style={{
+            color: C.textSecondary,
+            fontSize: 12,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            marginBottom: 8,
+            display: "block",
+          }}
+        >
+          Daily spending limit (MON)
+        </label>
+        <div
+          style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}
+        >
+          {[500, 1000, 1500, 2000, 3000, 5000].map((v) => (
+            <button
+              key={v}
+              onClick={() => setLimit(v)}
+              style={{
+                flex: "1 1 auto",
+                padding: "10px 0",
+                background: limit === v ? C.accent : C.bg,
+                border: `1px solid ${limit === v ? C.accent : C.border}`,
+                borderRadius: 10,
+                color: limit === v ? "#fff" : C.textSecondary,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {v >= 1000 ? `${v / 1000}k` : v}
+            </button>
+          ))}
+        </div>
+        <div
+          style={{
+            color: C.textTertiary,
+            fontSize: 11,
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          <Icon.Lock /> Enforced on-chain via SpendInteractor
+        </div>
+
+        {/* Error */}
+        {displayErr && (
+          <div
+            style={{
+              background: C.redSoft,
+              border: `1px solid rgba(255,107,107,0.2)`,
+              borderRadius: 12,
+              padding: "10px 14px",
+              marginBottom: 16,
+              color: C.red,
+              fontSize: 13,
+            }}
+          >
+            {displayErr}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={handleSubmit}
+            disabled={registering}
+            style={{
+              flex: 1,
+              padding: "14px",
+              background: C.accent,
+              border: "none",
+              borderRadius: 14,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              opacity: registering ? 0.5 : 1,
+            }}
+          >
+            {registering ? "Registering…" : "Register Card"}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: "14px",
+              background: C.redSoft,
+              border: `1px solid rgba(255,107,107,0.2)`,
+              borderRadius: 14,
+              color: C.red,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- Sub-account / Card Detail Modal ---
 function CardModal({
   card,
@@ -1192,11 +1434,15 @@ export default function S4bMobileApp() {
         },
         body: JSON.stringify({ address: userAddress }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(b?.error ?? res.statusText);
+      }
       return res.json() as Promise<{ safeAddress: string; created: boolean }>;
     },
     enabled: authenticated && !!userAddress,
     staleTime: Infinity,
+    retry: 3,
   });
 
   const {
@@ -1207,7 +1453,10 @@ export default function S4bMobileApp() {
     queryKey: ["balances"],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/balances`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(b?.error ?? res.statusText);
+      }
       return res.json() as Promise<Record<string, string>>;
     },
     enabled: authenticated,
@@ -1222,7 +1471,10 @@ export default function S4bMobileApp() {
     queryKey: ["eoas", userAddress],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/users/${userAddress}/eoas`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(b?.error ?? res.statusText);
+      }
       return res.json() as Promise<{
         eoas: string[];
         spendInteractorAddress: string;
@@ -1243,7 +1495,10 @@ export default function S4bMobileApp() {
       const res = await fetch(
         `${API_URL}/events?contract=${spendInteractorAddress}&limit=50`,
       );
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(b?.error ?? res.statusText);
+      }
       return res.json() as Promise<any[]>;
     },
     enabled: !!spendInteractorAddress,
@@ -1266,12 +1521,16 @@ export default function S4bMobileApp() {
         },
         body: JSON.stringify({ eoa, dailyLimit, allowedTypes: [0, 1] }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(body?.error ?? res.statusText);
+      }
       return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["eoas", userAddress] });
       setSelectedCardIdx(null);
+      setShowAddCard(false);
     },
   });
 
@@ -1295,6 +1554,7 @@ export default function S4bMobileApp() {
   const [tab, setTab] = useState("home");
   const [showTransfer, setShowTransfer] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
+  const [showAddCard, setShowAddCard] = useState(false);
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(true);
 
@@ -1773,12 +2033,6 @@ export default function S4bMobileApp() {
                       icon: <Icon.Send />,
                       color: C.accent,
                       action: () => setShowTransfer(true),
-                    },
-                    {
-                      label: "Refresh",
-                      icon: <Icon.Refresh />,
-                      color: C.yellow,
-                      action: refetchAll,
                     },
                   ].map((a, i) => (
                     <button
@@ -2490,22 +2744,32 @@ export default function S4bMobileApp() {
                   );
                 })}
                 <button
+                  onClick={() => {
+                    registerEoaMutation.reset();
+                    setShowAddCard(true);
+                  }}
+                  disabled={!safeAddress}
+                  title={
+                    !safeAddress ? "Account setup in progress…" : undefined
+                  }
                   style={{
                     width: "100%",
                     padding: 16,
                     background: C.card,
                     border: `1px dashed ${C.border}`,
                     borderRadius: 18,
-                    color: C.textSecondary,
+                    color: safeAddress ? C.textSecondary : C.textTertiary,
                     fontSize: 14,
-                    cursor: "pointer",
+                    cursor: safeAddress ? "pointer" : "not-allowed",
+                    opacity: safeAddress ? 1 : 0.5,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     gap: 8,
                   }}
                 >
-                  <Icon.Plus /> Add New Card (register EOA)
+                  <Icon.Plus />{" "}
+                  {safeAddress ? "Add New Card" : "Setting up account…"}
                 </button>
               </div>
             )}
@@ -2530,19 +2794,6 @@ export default function S4bMobileApp() {
                   >
                     History
                   </div>
-                  <button
-                    onClick={refetchAll}
-                    style={{
-                      color: C.accent,
-                      background: "none",
-                      border: "none",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Refresh
-                  </button>
                 </div>
 
                 {dataLoading && (
@@ -3136,6 +3387,19 @@ export default function S4bMobileApp() {
                 registerEoaMutation.mutate({ eoa, dailyLimit })
               }
               registering={registerEoaMutation.isPending}
+            />
+          )}
+          {showAddCard && (
+            <AddCardModal
+              onClose={() => {
+                setShowAddCard(false);
+                registerEoaMutation.reset();
+              }}
+              onAdd={(eoa, dailyLimit) =>
+                registerEoaMutation.mutate({ eoa, dailyLimit })
+              }
+              registering={registerEoaMutation.isPending}
+              error={dataError}
             />
           )}
         </div>
