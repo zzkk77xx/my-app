@@ -15,6 +15,27 @@ const AAVE_LOGO = "https://cryptologos.cc/logos/aave-aave-logo.svg";
 const UNI_LOGO = "https://cryptologos.cc/logos/uniswap-uni-logo.svg";
 const TOKEN_DECIMALS = 18;
 
+const MONAD_TESTNET = {
+  chainId: "0x279F", // 10143
+  chainName: "Monad Testnet",
+  nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 },
+  rpcUrls: ["https://testnet-rpc.monad.xyz/"],
+  blockExplorerUrls: ["https://testnet.monadexplorer.com/"],
+};
+
+async function switchToMonad(provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }) {
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MONAD_TESTNET.chainId }] });
+  } catch (e: unknown) {
+    // 4902 = chain not yet added to wallet
+    if ((e as { code?: number })?.code === 4902) {
+      await provider.request({ method: "wallet_addEthereumChain", params: [MONAD_TESTNET] });
+    } else {
+      throw e;
+    }
+  }
+}
+
 const AUTHORIZE_SPEND_ABI = [
   {
     type: "function",
@@ -352,6 +373,7 @@ function TransferModal({
 
       // 4. EOA signs & submits the tx — msg.sender must be the registered EOA
       const provider = await wallet.getEthereumProvider();
+      await switchToMonad(provider);
       const hash = await provider.request({
         method: "eth_sendTransaction",
         params: [{ from: userAddress, to: spendInteractorAddress, data: calldata }],
@@ -599,6 +621,7 @@ function DepositModal({
 
       setPhase("sending");
       const provider = await wallet.getEthereumProvider();
+      await switchToMonad(provider);
       await provider.request({
         method: "eth_sendTransaction",
         params: [
@@ -749,7 +772,7 @@ function DepositModal({
                 placeholder="0.00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                disabled={!canSubmit}
+                disabled={phase !== "idle" && phase !== "error"}
                 style={{
                   width: "100%",
                   padding: "14px 16px",
