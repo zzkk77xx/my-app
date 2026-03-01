@@ -4422,7 +4422,7 @@ export default function AnoBankMobileApp() {
                   }}
                 >
                   {cards
-                    .filter((c) => !c.isMain)
+                    .filter((c) => !c.isMain && c.isBackendCard)
                     .map((card) => {
                       const cardNum = cardNumberFromAddr(card.address);
                       const expiry = cardExpiryFromAddr(card.address);
@@ -5176,7 +5176,7 @@ export default function AnoBankMobileApp() {
                   My Cards
                 </div>
                 {cards
-                  .filter((c) => !c.isMain)
+                  .filter((c) => !c.isMain && c.isBackendCard)
                   .map((card) => {
                     const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
                     const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
