@@ -3908,7 +3908,7 @@ export default function AnoBankMobileApp() {
   // Events as transaction rows
   const txRows = events.map((ev: any) => ({
     name: "SpendAuthorized",
-    amount: ev.amount ? parseFloat(fmtWei(ev.amount)) : 0,
+    amount: ev.amount ? parseFloat(fmtWei(ev.amount, 18)) : 0,
     date: ev.blockNumber ? `Block ${ev.blockNumber}` : "",
     icon: "",
     recipient: ev.recipient ? shortenAddr(ev.recipient, 6) : "",
