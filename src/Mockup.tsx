@@ -2362,6 +2362,7 @@ export default function S4bMobileApp() {
                       height: 140,
                       borderRadius: 70,
                       background: "rgba(108,92,231,0.06)",
+                      pointerEvents: "none",
                     }}
                   />
                   <div
@@ -3922,20 +3923,8 @@ export default function S4bMobileApp() {
                       wordBreak: "break-all",
                     }}
                   >
-                    {userAddress}
+                    {shortenAddr(userAddress, 4)}
                   </div>
-                  {safeAddress && (
-                    <div
-                      style={{
-                        color: C.textTertiary,
-                        fontSize: 12,
-                        fontFamily: "monospace",
-                        marginBottom: 10,
-                      }}
-                    >
-                      Safe: {safeAddress}
-                    </div>
-                  )}
                   <button
                     onClick={logout}
                     style={{
@@ -3952,50 +3941,6 @@ export default function S4bMobileApp() {
                     Disconnect
                   </button>
                 </div>
-
-                {/* SpendInteractor info */}
-                {spendInteractorAddress && (
-                  <div
-                    style={{
-                      background: C.card,
-                      borderRadius: 16,
-                      padding: "16px",
-                      marginBottom: 16,
-                      border: `1px solid ${C.border}`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: C.textTertiary,
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                        marginBottom: 8,
-                      }}
-                    >
-                      SpendInteractor
-                    </div>
-                    <div
-                      style={{
-                        color: C.textPrimary,
-                        fontSize: 12,
-                        fontFamily: "monospace",
-                        wordBreak: "break-all",
-                      }}
-                    >
-                      {spendInteractorAddress}
-                    </div>
-                    <div
-                      style={{
-                        color: C.textTertiary,
-                        fontSize: 12,
-                        marginTop: 6,
-                      }}
-                    >
-                      {eoas.length} registered EOA(s)
-                    </div>
-                  </div>
-                )}
 
                 {/* Generate Payment QR */}
                 <div
