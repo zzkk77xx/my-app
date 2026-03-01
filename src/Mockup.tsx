@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   usePrivy,
   useWallets,
@@ -23,13 +23,21 @@ const MONAD_TESTNET = {
   blockExplorerUrls: ["https://testnet.monadexplorer.com/"],
 };
 
-async function switchToMonad(provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }) {
+async function switchToMonad(provider: {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}) {
   try {
-    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MONAD_TESTNET.chainId }] });
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: MONAD_TESTNET.chainId }],
+    });
   } catch (e: unknown) {
     // 4902 = chain not yet added to wallet
     if ((e as { code?: number })?.code === 4902) {
-      await provider.request({ method: "wallet_addEthereumChain", params: [MONAD_TESTNET] });
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [MONAD_TESTNET],
+      });
     } else {
       throw e;
     }
@@ -284,8 +292,7 @@ const phoneFrame: React.CSSProperties = {
   position: "relative",
   overflow: "hidden",
   fontFamily: "'SF Pro Display', 'Helvetica Neue', -apple-system, sans-serif",
-  boxShadow:
-    "0 25px 80px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06) inset",
+  boxShadow: "0 25px 80px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06) inset",
 };
 
 // --- Helpers ---
@@ -321,6 +328,227 @@ function parseWei(amount: string, decimals = TOKEN_DECIMALS): string {
   }
 }
 
+function cardNumberFromAddr(addr: string): string {
+  if (!addr || addr.length < 18) return "•••• •••• •••• 0000";
+  const s = addr.slice(2).toUpperCase();
+  return `${s.slice(0, 4)} ${s.slice(4, 8)} ${s.slice(8, 12)} ${s.slice(12, 16)}`;
+}
+
+function cardExpiryFromAddr(addr: string): string {
+  if (!addr || addr.length < 6) return "12/29";
+  const byte = parseInt(addr.slice(-2), 16) || 0;
+  const month = (byte % 12) + 1;
+  const year = 26 + (byte % 4);
+  return `${String(month).padStart(2, "0")}/${year}`;
+}
+
+// --- QR Scanner Modal ---
+function QRScannerModal({
+  onClose,
+  onScan,
+}: {
+  onClose: () => void;
+  onScan: (address: string, amount: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function start() {
+      if (!("BarcodeDetector" in window)) {
+        setErr("QR scanning requires Chrome or Edge. Please try a different browser.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        streamRef.current = stream;
+        if (videoRef.current && !cancelled) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        // @ts-ignore
+        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+
+        async function detect() {
+          if (cancelled || !videoRef.current) return;
+          try {
+            // @ts-ignore
+            const codes = await detector.detect(videoRef.current);
+            if (codes.length > 0) {
+              handleRaw(codes[0].rawValue as string);
+              return;
+            }
+          } catch {}
+          rafRef.current = requestAnimationFrame(detect);
+        }
+        detect();
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message ?? "Camera access denied.");
+      }
+    }
+
+    start();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  function handleRaw(raw: string) {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    cancelAnimationFrame(rafRef.current);
+    let address = "";
+    let amount = "";
+    try {
+      const j = JSON.parse(raw);
+      address = j.address ?? j.to ?? "";
+      amount = j.amount ?? j.value ?? "";
+    } catch {
+      const eip = raw.match(/(?:ethereum|monad):([0-9a-fA-Fx]+)/);
+      if (eip) {
+        address = eip[1];
+        const val = raw.match(/[?&]value=([0-9.]+)/);
+        if (val) amount = val[1];
+      } else if (/^0x[0-9a-fA-F]{40}/.test(raw.trim())) {
+        const parts = raw.trim().split(/[:?&]/);
+        address = parts[0];
+        amount = parts[1] ?? "";
+      }
+    }
+    if (/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      onScan(address, amount);
+    } else {
+      setErr("Could not read a valid address from QR code. Try again.");
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "#000",
+        zIndex: 200,
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 44,
+        overflow: "hidden",
+      }}
+    >
+      {err ? (
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 16,
+            padding: 32,
+            color: "#fff",
+          }}
+        >
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E5334A" strokeWidth="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p style={{ textAlign: "center", fontSize: 14, color: "rgba(255,255,255,0.8)", lineHeight: 1.5 }}>{err}</p>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "12px 28px",
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              borderRadius: 14,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      ) : (
+        <>
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          {/* Viewfinder overlay */}
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              width: 200,
+              height: 200,
+            }}
+          >
+            {/* Corner brackets */}
+            {[
+              { top: 0, left: 0, borderTop: "3px solid #fff", borderLeft: "3px solid #fff" },
+              { top: 0, right: 0, borderTop: "3px solid #fff", borderRight: "3px solid #fff" },
+              { bottom: 0, left: 0, borderBottom: "3px solid #fff", borderLeft: "3px solid #fff" },
+              { bottom: 0, right: 0, borderBottom: "3px solid #fff", borderRight: "3px solid #fff" },
+            ].map((s, i) => (
+              <div key={i} style={{ position: "absolute", width: 28, height: 28, borderRadius: 3, ...s }} />
+            ))}
+          </div>
+          {/* Label */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 120,
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 500,
+              textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+            }}
+          >
+            Point at a QR code
+          </div>
+          {/* Cancel */}
+          <button
+            onClick={onClose}
+            style={{
+              position: "absolute",
+              bottom: 60,
+              left: "50%",
+              transform: "translateX(-50%)",
+              padding: "12px 32px",
+              background: "rgba(255,255,255,0.18)",
+              border: "1px solid rgba(255,255,255,0.3)",
+              borderRadius: 16,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            Cancel
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 // --- Transfer Modal ---
 function TransferModal({
@@ -328,25 +556,35 @@ function TransferModal({
   nativeBalance,
   spendInteractorAddress,
   userAddress,
+  initialRecipient = "",
+  initialAmount = "",
 }: {
   onClose: () => void;
   nativeBalance: string;
   spendInteractorAddress: string | null;
   userAddress: string;
+  initialRecipient?: string;
+  initialAmount?: string;
 }) {
   const { wallets } = useWallets();
   const wallet = wallets[0];
 
-  const [amount, setAmount] = useState("");
-  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState(initialAmount);
+  const [recipient, setRecipient] = useState(initialRecipient);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
 
   async function handleSend() {
     if (!amount || !recipient || sending) return;
-    if (!spendInteractorAddress) { setErr("Account setup not yet complete."); return; }
-    if (!wallet) { setErr("No wallet connected."); return; }
+    if (!spendInteractorAddress) {
+      setErr("Account setup not yet complete.");
+      return;
+    }
+    if (!wallet) {
+      setErr("No wallet connected.");
+      return;
+    }
 
     setSending(true);
     setErr("");
@@ -361,7 +599,7 @@ function TransferModal({
 
       // 2. recipientHash = keccak256(abi.encodePacked(address)) — matches Solidity
       const recipientHash = keccak256(
-        encodePacked(["address"], [recipient as `0x${string}`])
+        encodePacked(["address"], [recipient as `0x${string}`]),
       );
 
       // 3. Encode authorizeSpend(amount, recipientHash, transferType=1)
@@ -376,7 +614,9 @@ function TransferModal({
       await switchToMonad(provider);
       const hash = await provider.request({
         method: "eth_sendTransaction",
-        params: [{ from: userAddress, to: spendInteractorAddress, data: calldata }],
+        params: [
+          { from: userAddress, to: spendInteractorAddress, data: calldata },
+        ],
       });
 
       setTxHash(hash as string);
@@ -471,23 +711,42 @@ function TransferModal({
         >
           Recipient
         </label>
-        <input
-          placeholder="IBAN or wallet address"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "14px 16px",
-            background: C.bg,
-            border: `1px solid ${C.border}`,
-            borderRadius: 14,
-            color: C.textPrimary,
-            fontSize: 15,
-            marginBottom: 16,
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-        />
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <input
+            placeholder="IBAN or wallet address"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "14px 16px",
+              background: C.bg,
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+              color: C.textPrimary,
+              fontSize: 15,
+              outline: "none",
+              boxSizing: "border-box",
+              paddingRight: 120,
+            }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              right: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 12,
+              color: C.accent,
+              fontWeight: 600,
+              cursor: "not-allowed",
+              userSelect: "none",
+              letterSpacing: 0.2,
+              whiteSpace: "nowrap",
+            }}
+          >
+            Scan QR code
+          </span>
+        </div>
 
         <label
           style={{
@@ -523,10 +782,22 @@ function TransferModal({
           />
         </div>
 
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 16, padding: "8px 12px", background: C.yellowSoft, border: `1px solid rgba(224,155,0,0.18)`, borderRadius: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 6,
+            marginBottom: 16,
+            padding: "8px 12px",
+            background: C.yellowSoft,
+            border: `1px solid rgba(224,155,0,0.18)`,
+            borderRadius: 10,
+          }}
+        >
           <span style={{ color: C.yellow, fontSize: 13, marginTop: 1 }}>ⓘ</span>
           <span style={{ color: C.yellow, fontSize: 12, lineHeight: 1.5 }}>
-            Transfers above <strong>10,000 MON</strong> require bank compliance verification before processing.
+            Transfers above <strong>10,000 MON</strong> require bank compliance
+            verification before processing.
           </span>
         </div>
 
@@ -547,8 +818,19 @@ function TransferModal({
         )}
 
         {txHash && (
-          <div style={{ background: C.greenSoft, border: `1px solid rgba(0,168,107,0.2)`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 13 }}>
-            <div style={{ color: C.green, fontWeight: 600, marginBottom: 4 }}>Transfer authorized on-chain</div>
+          <div
+            style={{
+              background: C.greenSoft,
+              border: `1px solid rgba(0,168,107,0.2)`,
+              borderRadius: 12,
+              padding: "10px 14px",
+              marginBottom: 16,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ color: C.green, fontWeight: 600, marginBottom: 4 }}>
+              Transfer authorized on-chain
+            </div>
             <div style={{ color: C.textSecondary, fontSize: 12 }}>
               Tx: {shortenAddr(txHash, 10)}
             </div>
@@ -585,6 +867,152 @@ function TransferModal({
   );
 }
 
+// --- QR Generator Modal ---
+function QRGeneratorModal({
+  onClose,
+  defaultAddress,
+}: {
+  onClose: () => void;
+  defaultAddress: string;
+}) {
+  const [address, setAddress] = useState(defaultAddress);
+  const [amount, setAmount] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const data = amount.trim()
+      ? JSON.stringify({ address: address.trim(), amount: amount.trim() })
+      : address.trim() || " ";
+    import("qrcode").then((QRCode) => {
+      QRCode.toCanvas(canvasRef.current!, data, {
+        width: 220,
+        margin: 2,
+        color: { dark: "#0D1117", light: "#FFFFFF" },
+      });
+    });
+  }, [address, amount]);
+
+  const isValidAddr = /^0x[0-9a-fA-F]{40}$/.test(address.trim());
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "flex-end",
+        zIndex: 100,
+        borderRadius: 44,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          background: C.card,
+          borderRadius: "28px 28px 44px 44px",
+          padding: "24px 24px 40px",
+        }}
+      >
+        {/* Handle */}
+        <div style={{ width: 40, height: 4, background: C.border, borderRadius: 2, margin: "0 auto 20px" }} />
+
+        <div style={{ fontSize: 17, fontWeight: 700, color: C.textPrimary, marginBottom: 20 }}>
+          Generate Payment QR
+        </div>
+
+        {/* Address */}
+        <label style={{ display: "block", fontSize: 11, color: C.textSecondary, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 }}>
+          Recipient Address
+        </label>
+        <input
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="0x..."
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            background: C.bg,
+            border: `1px solid ${isValidAddr || !address ? C.border : C.red}`,
+            borderRadius: 12,
+            color: C.textPrimary,
+            fontSize: 13,
+            fontFamily: "monospace",
+            marginBottom: 12,
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+
+        {/* Amount */}
+        <label style={{ display: "block", fontSize: 11, color: C.textSecondary, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 }}>
+          Amount (MON) — optional
+        </label>
+        <input
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          inputMode="decimal"
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            color: C.textPrimary,
+            fontSize: 14,
+            marginBottom: 20,
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+
+        {/* QR canvas */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+          <div
+            style={{
+              padding: 12,
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <canvas ref={canvasRef} />
+          </div>
+        </div>
+
+        {/* Hint */}
+        <div style={{ textAlign: "center", color: C.textTertiary, fontSize: 11, marginBottom: 20 }}>
+          {isValidAddr
+            ? "Scan with any wallet to pay"
+            : "Enter a valid address to generate the QR code"}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: 14,
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            color: C.textSecondary,
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Deposit Modal ---
 function DepositModal({
   onClose,
@@ -593,256 +1021,60 @@ function DepositModal({
   onClose: () => void;
   depositorAddress: string | null;
 }) {
-  const { wallets } = useWallets();
-  const { login } = usePrivy();
-  const [amount, setAmount] = useState("");
-  const [phase, setPhase] = useState<
-    "idle" | "preparing" | "sending" | "confirming" | "done" | "error"
-  >("idle");
-  const [err, setErr] = useState("");
-  const wallet = wallets[0];
+  const [copied, setCopied] = useState(false);
 
-  async function handleDeposit() {
-    if (!amount || !depositorAddress || !wallet) return;
-    setErr("");
-    try {
-      setPhase("preparing");
-      const prepRes = await fetch(`${API_URL}/deposit/prepare`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          depositor: depositorAddress,
-          token: NATIVE_TOKEN,
-          amount: parseWei(amount),
-        }),
-      });
-      if (!prepRes.ok) throw new Error(await prepRes.text());
-      const { to, calldata, value, relayId } = await prepRes.json();
-
-      setPhase("sending");
-      const provider = await wallet.getEthereumProvider();
-      await switchToMonad(provider);
-      await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          {
-            from: depositorAddress,
-            to,
-            data: calldata,
-            value: `0x${BigInt(value || 0).toString(16)}`,
-          },
-        ],
-      });
-
-      setPhase("confirming");
-      await fetch(`${API_URL}/deposit/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ relayId }),
-      });
-      setPhase("done");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-      setPhase("error");
-    }
+  async function handleCopy() {
+    if (!depositorAddress) return;
+    await navigator.clipboard.writeText(depositorAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
-  const phaseLabel: Record<string, string> = {
-    idle: "Confirm Deposit",
-    preparing: "Preparing…",
-    sending: "Waiting for wallet…",
-    confirming: "Confirming…",
-    done: "Deposit submitted!",
-    error: "Try again",
-  };
-  const canSubmit = (phase === "idle" || phase === "error") && !!amount;
-
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 100,
-        background: "rgba(0,0,0,0.7)",
-        backdropFilter: "blur(10px)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end",
-      }}
-    >
-      <div
-        style={{
-          background: C.card,
-          borderRadius: "24px 24px 0 0",
-          padding: "28px 24px 40px",
-          borderTop: `1px solid ${C.border}`,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 24,
-          }}
-        >
-          <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>
-            Deposit Funds
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              background: "rgba(0,0,0,0.06)",
-              border: "none",
-              color: C.textSecondary,
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              cursor: "pointer",
-              fontSize: 16,
-            }}
-          >
-            ✕
-          </button>
+    <div style={{ position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(10px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <div style={{ background: C.card, borderRadius: "24px 24px 0 0", padding: "28px 24px 40px", borderTop: `1px solid ${C.border}` }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>Add Funds</span>
+          <button onClick={onClose} style={{ background: "rgba(0,0,0,0.06)", border: "none", color: C.textSecondary, width: 32, height: 32, borderRadius: 16, cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
 
-        {!depositorAddress ? (
-          <div style={{ textAlign: "center", padding: "20px 0" }}>
-            <div
-              style={{ color: C.textSecondary, fontSize: 14, marginBottom: 16 }}
-            >
-              Connect an external wallet to deposit funds.
+        <div style={{ color: C.textSecondary, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
+          Send <strong style={{ color: C.textPrimary }}>MON</strong> from Rabby, MetaMask, or any wallet to this address on <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
+        </div>
+
+        {/* Network badge */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.accentSoft, border: `1px solid ${C.accent}22`, borderRadius: 8, padding: "4px 10px", marginBottom: 16, fontSize: 12, color: C.accent, fontWeight: 600 }}>
+          <div style={{ width: 6, height: 6, borderRadius: 3, background: C.green }} />
+          Monad Testnet · Chain ID 10143
+        </div>
+
+        {/* Address box */}
+        {depositorAddress ? (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px", marginBottom: 20 }}>
+            <div style={{ color: C.textTertiary, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Deposit Address</div>
+            <div style={{ color: C.textPrimary, fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", marginBottom: 14, lineHeight: 1.6 }}>
+              {depositorAddress}
             </div>
             <button
-              onClick={login}
-              style={{
-                padding: "14px 24px",
-                background: C.accent,
-                border: "none",
-                borderRadius: 14,
-                color: "#fff",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              onClick={handleCopy}
+              style={{ width: "100%", padding: "13px", background: copied ? C.greenSoft : C.accentSoft, border: `1px solid ${copied ? C.green : C.accent}33`, borderRadius: 12, color: copied ? C.green : C.accent, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
             >
-              Connect Wallet
+              {copied ? "Copied!" : "Copy Address"}
             </button>
           </div>
         ) : (
-          <>
-            <div
-              style={{
-                background: C.accentSoft,
-                borderRadius: 14,
-                padding: "14px 16px",
-                marginBottom: 20,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <div>
-                <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
-                  Bank Transfer (SEPA / on-chain)
-                </div>
-                <div
-                  style={{ color: C.textSecondary, fontSize: 12, marginTop: 2 }}
-                >
-                  From: {shortenAddr(depositorAddress, 8)}
-                </div>
-              </div>
-            </div>
-
-            <label
-              style={{
-                color: C.textSecondary,
-                fontSize: 12,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-                marginBottom: 6,
-                display: "block",
-              }}
-            >
-              Amount to deposit
-            </label>
-            <div style={{ position: "relative", marginBottom: 20 }}>
-              <input
-                type="number"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={phase !== "idle" && phase !== "error"}
-                style={{
-                  width: "100%",
-                  padding: "14px 16px",
-                  background: C.bg,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 14,
-                  color: C.textPrimary,
-                  fontSize: 22,
-                  fontWeight: 600,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-
-            {err && (
-              <div
-                style={{
-                  background: C.redSoft,
-                  border: `1px solid rgba(229,51,74,0.2)`,
-                  borderRadius: 12,
-                  padding: "10px 14px",
-                  marginBottom: 16,
-                  color: C.red,
-                  fontSize: 13,
-                }}
-              >
-                {err}
-              </div>
-            )}
-            {phase === "done" && (
-              <div
-                style={{
-                  background: C.greenSoft,
-                  border: `1px solid rgba(0,168,107,0.2)`,
-                  borderRadius: 12,
-                  padding: "10px 14px",
-                  marginBottom: 16,
-                  color: C.green,
-                  fontSize: 13,
-                }}
-              >
-                Deposit submitted successfully.
-              </div>
-            )}
-
-            <button
-              onClick={handleDeposit}
-              disabled={!canSubmit}
-              style={{
-                width: "100%",
-                padding: "16px",
-                background: C.green,
-                border: "none",
-                borderRadius: 16,
-                color: "#fff",
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                opacity: !canSubmit ? 0.5 : 1,
-              }}
-            >
-              <Icon.Download /> {phaseLabel[phase]}
-            </button>
-          </>
+          <div style={{ background: C.redSoft, borderRadius: 12, padding: "12px 16px", marginBottom: 20, color: C.red, fontSize: 13 }}>
+            No wallet address found.
+          </div>
         )}
+
+        {/* Warning */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", background: C.yellowSoft, border: `1px solid rgba(224,155,0,0.2)`, borderRadius: 12, fontSize: 12, color: C.yellow, lineHeight: 1.5 }}>
+          <span style={{ marginTop: 1 }}>ⓘ</span>
+          <span>Only send MON on Monad Testnet. Funds sent on other networks cannot be recovered.</span>
+        </div>
       </div>
     </div>
   );
@@ -1416,10 +1648,7 @@ export default function S4bMobileApp() {
     retry: 3,
   });
 
-  const {
-    data: balancesData,
-    isLoading: balancesLoading,
-  } = useQuery({
+  const { data: balancesData, isLoading: balancesLoading } = useQuery({
     queryKey: ["balances"],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/balances`);
@@ -1433,10 +1662,7 @@ export default function S4bMobileApp() {
     refetchInterval: 30_000,
   });
 
-  const {
-    data: eoasData,
-    isLoading: eoasLoading,
-  } = useQuery({
+  const { data: eoasData, isLoading: eoasLoading } = useQuery({
     queryKey: ["eoas", userAddress],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/users/${userAddress}/eoas`);
@@ -1454,10 +1680,7 @@ export default function S4bMobileApp() {
 
   const spendInteractorAddress = eoasData?.spendInteractorAddress ?? null;
 
-  const {
-    data: eventsData,
-    isLoading: eventsLoading,
-  } = useQuery({
+  const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", spendInteractorAddress],
     queryFn: async () => {
       const res = await fetch(
@@ -1517,6 +1740,9 @@ export default function S4bMobileApp() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [qrPreset, setQrPreset] = useState<{ address: string; amount: string } | null>(null);
+  const [showQrGenerator, setShowQrGenerator] = useState(false);
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(true);
 
@@ -1822,7 +2048,8 @@ export default function S4bMobileApp() {
                       {shortenAddr(userAddress, 4)}
                     </div>
                   </div>
-                  <div
+                  <button
+                    onClick={() => setTab("settings")}
                     style={{
                       width: 42,
                       height: 42,
@@ -1831,14 +2058,13 @@ export default function S4bMobileApp() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      border: `1.5px solid ${C.accent}`,
-                      fontSize: 18,
-                      color: C.accent,
-                      fontWeight: 700,
+                      border: `1.5px solid ${C.border}`,
+                      color: C.textSecondary,
+                      cursor: "pointer",
                     }}
                   >
-                    {userAddress[2]?.toUpperCase()}
-                  </div>
+                    <Icon.Settings />
+                  </button>
                 </div>
 
                 {/* Error banner */}
@@ -2081,85 +2307,66 @@ export default function S4bMobileApp() {
                   }}
                 >
                   {cards.map((card) => {
-                    const daily = parseFloat(fmtWei(card.dailyLimit)) || 0;
-                    const rem = parseFloat(fmtWei(card.remaining)) || 0;
-                    const spent = Math.max(0, daily - rem);
-                    const pct = daily > 0 ? (spent / daily) * 100 : 0;
+                    const cardNum = cardNumberFromAddr(card.address);
+                    const expiry = cardExpiryFromAddr(card.address);
+                    const colorA = card.color;
+                    const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
                     return (
                       <div
                         key={card.id}
                         onClick={() => setSelectedCardIdx(card.id)}
                         style={{
-                          minWidth: 165,
-                          background: C.card,
-                          borderRadius: 18,
-                          padding: "16px",
-                          border: `1px solid ${card.isMain ? card.color : C.border}`,
+                          minWidth: 230,
+                          height: 140,
+                          borderRadius: 20,
+                          padding: "16px 18px",
+                          background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
                           cursor: "pointer",
                           flexShrink: 0,
+                          position: "relative",
+                          overflow: "hidden",
+                          boxShadow: `0 8px 24px ${colorA}55`,
+                          color: "#fff",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 12,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              background: card.color,
-                            }}
-                          />
+                        {/* Decorative circles */}
+                        <div style={{ position: "absolute", top: -25, right: -25, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
+                        <div style={{ position: "absolute", bottom: -35, right: 15, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
+
+                        {/* Top row: chip + scan */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                          {/* EMV chip */}
+                          <div style={{ width: 30, height: 22, borderRadius: 4, background: "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)", border: "1px solid rgba(255,255,255,0.4)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, padding: 4, boxSizing: "border-box" }}>
+                            {[0,1,2,3].map(i => <div key={i} style={{ background: "rgba(180,140,0,0.55)", borderRadius: 1 }} />)}
+                          </div>
+                          {/* Scan QR */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setShowQrScanner(true); }}
+                            style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: "4px 9px", color: "#fff", fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, letterSpacing: 0.2 }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                              <rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/><rect x="14" y="18" width="3" height="0"/><rect x="18" y="14" width="0" height="3"/>
+                            </svg>
+                            Scan QR
+                          </button>
                         </div>
-                        <div
-                          style={{
-                            color: C.textPrimary,
-                            fontSize: 17,
-                            fontWeight: 700,
-                            marginBottom: 2,
-                          }}
-                        >
-                          {card.isMain ? `${nativeBalance}` : "—"}
+
+                        {/* Card number */}
+                        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: 2.5, marginBottom: 12, opacity: 0.92, fontFamily: "monospace" }}>
+                          {cardNum}
                         </div>
-                        <div
-                          style={{
-                            color: C.textSecondary,
-                            fontSize: 11,
-                            marginBottom: 10,
-                          }}
-                        >
-                          {card.name}
-                        </div>
-                        <div
-                          style={{
-                            background: C.bg,
-                            borderRadius: 3,
-                            height: 4,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div
-                            style={{
-                              height: "100%",
-                              borderRadius: 3,
-                              width: `${Math.min(pct, 100)}%`,
-                              background: pct > 80 ? C.red : card.color,
-                            }}
-                          />
-                        </div>
-                        <div
-                          style={{
-                            color: C.textTertiary,
-                            fontSize: 10,
-                            marginTop: 4,
-                          }}
-                        >
-                          {shortenAddr(card.address, 4)}
+
+                        {/* Bottom: name + expiry */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                          <div>
+                            <div style={{ fontSize: 8, opacity: 0.65, marginBottom: 2, letterSpacing: 0.8, textTransform: "uppercase" }}>Cardholder</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>S4B USER</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 8, opacity: 0.65, marginBottom: 2, letterSpacing: 0.8 }}>EXPIRES</div>
+                            <div style={{ fontSize: 11, fontWeight: 700 }}>{expiry}</div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -2261,7 +2468,7 @@ export default function S4bMobileApp() {
                         src: UNI_LOGO,
                         alt: "Uniswap",
                         label: "Uniswap",
-                        sub: "Swap & LP",
+                        sub: "Provide Liquidity",
                       },
                     ].map((p) => (
                       <div
@@ -2302,7 +2509,7 @@ export default function S4bMobileApp() {
                         </span>
                       </div>
                     ))}
-                    <div
+                    {/* <div
                       style={{
                         flex: 1,
                         background: C.bg,
@@ -2322,8 +2529,8 @@ export default function S4bMobileApp() {
                       </span>
                       <span style={{ color: C.textTertiary, fontSize: 10 }}>
                         More
-                      </span>
-                    </div>
+                      </span> 
+                    </div> */}
                   </div>
                 </div>
 
@@ -2644,6 +2851,16 @@ export default function S4bMobileApp() {
                               MAIN
                             </div>
                           )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setShowQrScanner(true); }}
+                            style={{ background: C.accentSoft, border: "none", borderRadius: 8, padding: "5px 10px", color: C.accent, fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                              <rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/>
+                            </svg>
+                            Scan QR
+                          </button>
                           <div style={{ color: C.textSecondary }}>
                             <Icon.ArrowRight />
                           </div>
@@ -3159,6 +3376,33 @@ export default function S4bMobileApp() {
                   </div>
                 )}
 
+                {/* Generate Payment QR */}
+                <div
+                  onClick={() => setShowQrGenerator(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "16px",
+                    background: C.card,
+                    borderRadius: 16,
+                    marginBottom: 8,
+                    border: `1px solid ${C.border}`,
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: C.textPrimary, fontSize: 14, fontWeight: 500 }}>
+                      Generate Payment QR
+                    </div>
+                    <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 1 }}>
+                      Share your address as a scannable QR code
+                    </div>
+                  </div>
+                  <div style={{ color: C.textTertiary }}>
+                    <Icon.ArrowRight />
+                  </div>
+                </div>
+
                 {/* Account Security — MFA enrollment */}
                 <div
                   onClick={showMfaEnrollmentModal}
@@ -3282,7 +3526,6 @@ export default function S4bMobileApp() {
               { id: "transfer", label: "Send", icon: <Icon.Transfer /> },
               { id: "history", label: "History", icon: <Icon.TrendUp /> },
               { id: "defi", label: "DeFi", icon: <Icon.DeFi /> },
-              { id: "settings", label: "Settings", icon: <Icon.Settings /> },
             ].map((t) => (
               <button
                 key={t.id}
@@ -3316,10 +3559,22 @@ export default function S4bMobileApp() {
           {/* Modals */}
           {showTransfer && (
             <TransferModal
-              onClose={() => setShowTransfer(false)}
+              onClose={() => { setShowTransfer(false); setQrPreset(null); }}
               nativeBalance={nativeBalance}
               spendInteractorAddress={spendInteractorAddress}
               userAddress={userAddress}
+              initialRecipient={qrPreset?.address ?? ""}
+              initialAmount={qrPreset?.amount ?? ""}
+            />
+          )}
+          {showQrScanner && (
+            <QRScannerModal
+              onClose={() => setShowQrScanner(false)}
+              onScan={(address, amount) => {
+                setShowQrScanner(false);
+                setQrPreset({ address, amount });
+                setShowTransfer(true);
+              }}
             />
           )}
           {showDeposit && (
@@ -3350,6 +3605,12 @@ export default function S4bMobileApp() {
               }
               registering={registerEoaMutation.isPending}
               error={dataError}
+            />
+          )}
+          {showQrGenerator && (
+            <QRGeneratorModal
+              onClose={() => setShowQrGenerator(false)}
+              defaultAddress={userAddress ?? ""}
             />
           )}
         </div>

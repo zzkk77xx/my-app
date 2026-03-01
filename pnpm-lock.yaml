@@ -14,12 +14,18 @@ dependencies:
   '@tanstack/react-query':
     specifier: ^5.90.21
     version: 5.90.21(react@19.2.4)
+  '@types/qrcode':
+    specifier: ^1.5.6
+    version: 1.5.6
   '@unlink-xyz/core':
     specifier: 0.1.7-canary.4b89772
     version: 0.1.7-canary.4b89772
   '@unlink-xyz/react':
     specifier: 0.1.7-canary.4b89772
     version: 0.1.7-canary.4b89772(react@19.2.4)
+  qrcode:
+    specifier: ^1.5.4
+    version: 1.5.4
   react:
     specifier: ^19.2.0
     version: 19.2.4
@@ -3454,6 +3460,12 @@ packages:
     resolution: {integrity: sha512-BgjLoRuSr0MTI5wA6gMw9Xy0sFudAaUuvrnjgGx9wZ522fYYLA5SYJ+1Y30vTcJEG+DRCyDHx/gzQVfofYzSdg==}
     dependencies:
       undici-types: 7.16.0
+
+  /@types/qrcode@1.5.6:
+    resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
+    dependencies:
+      '@types/node': 24.10.15
+    dev: false
 
   /@types/react-dom@19.2.3(@types/react@19.2.14):
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
