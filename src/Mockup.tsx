@@ -2297,32 +2297,6 @@ function DepositModal({
                 </div>
               </div>
             </div>
-
-            {/* Network badge */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: C.accentSoft,
-                border: `1px solid ${C.accent}22`,
-                borderRadius: 8,
-                padding: "4px 10px",
-                fontSize: 12,
-                color: C.accent,
-                fontWeight: 600,
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  background: C.green,
-                }}
-              />
-              Monad Testnet · Chain ID 10143
-            </div>
           </>
         )}
 
@@ -4427,7 +4401,7 @@ export default function AnoBankMobileApp() {
                   }}
                 >
                   {cards
-                    .filter((c) => !c.isMain)
+                    .filter((c) => !c.isMain && c.isBackendCard)
                     .map((card) => {
                       const cardNum = cardNumberFromAddr(card.address);
                       const expiry = cardExpiryFromAddr(card.address);
@@ -5181,7 +5155,7 @@ export default function AnoBankMobileApp() {
                   My Cards
                 </div>
                 {cards
-                  .filter((c) => !c.isMain)
+                  .filter((c) => !c.isMain && c.isBackendCard)
                   .map((card) => {
                     const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
                     const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
@@ -5771,7 +5745,7 @@ export default function AnoBankMobileApp() {
                         textTransform: "uppercase",
                       }}
                     >
-                      Coming Soon
+                      Coming Soon - not in Monad Testnet
                     </div>
                     <div
                       style={{
