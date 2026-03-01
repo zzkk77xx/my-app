@@ -76,6 +76,29 @@ const SPEND_INTERACTOR_READ_ABI = [
   },
 ] as const;
 
+const ERC20_ABI = [
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
 async function rpcRead(to: string, data: string): Promise<string> {
   const res = await fetch("https://testnet-rpc.monad.xyz/", {
     method: "POST",
@@ -1591,22 +1614,150 @@ function DepositModal({
   depositorAddress: string | null;
   accountNumber: string | null;
 }) {
-  const [copied, setCopied] = useState(false);
-  const [copiedAcct, setCopiedAcct] = useState(false);
+  const { wallets } = useWallets();
+  const wallet = wallets[0];
+  const qc = useQueryClient();
 
-  async function handleCopy() {
-    if (!depositorAddress) return;
-    await navigator.clipboard.writeText(depositorAddress);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const [mode, setMode] = useState<"choose" | "self" | "other">("choose");
+  const [amount, setAmount] = useState("");
+  const [otherAcctNum, setOtherAcctNum] = useState("");
+  const [stage, setStage] = useState<"input" | "processing" | "done">("input");
+  const [step, setStep] = useState(0);
+  const [approveSkipped, setApproveSkipped] = useState(false);
+  const [err, setErr] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const targetAcctNum = mode === "self" ? accountNumber : otherAcctNum;
+
+  async function handleDeposit() {
+    if (!depositorAddress || !wallet || !amount || !targetAcctNum) return;
+    setSending(true);
+    setErr("");
+    setStage("processing");
+    setStep(0);
+    setApproveSkipped(false);
+
+    try {
+      // Step 0: Prepare deposit
+      const prepRes = await fetch(`${API_URL}/deposit/prepare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          depositor: depositorAddress,
+          token: NATIVE_TOKEN,
+          amount: parseWei(amount),
+          accountNumber: parseInt(targetAcctNum),
+        }),
+      });
+      const prepData = await prepRes.json();
+      if (!prepRes.ok)
+        throw new Error(prepData.error || prepRes.statusText);
+
+      const { to: poolAddress, calldata, value, relayId } = prepData;
+
+      const provider = await wallet.getEthereumProvider();
+      await switchToMonad(provider);
+
+      // Step 1: Check allowance & approve if needed
+      setStep(1);
+      const amountBn = BigInt(parseWei(amount));
+      const allowData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: "allowance",
+        args: [
+          depositorAddress as `0x${string}`,
+          poolAddress as `0x${string}`,
+        ],
+      });
+      const allowHex = await rpcRead(NATIVE_TOKEN, allowData);
+      const currentAllowance =
+        allowHex === "0x0" ? 0n : BigInt(allowHex);
+
+      if (currentAllowance < amountBn) {
+        const appData = encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [poolAddress as `0x${string}`, 2n ** 256n - 1n],
+        });
+        const appHash = (await provider.request({
+          method: "eth_sendTransaction",
+          params: [
+            { from: depositorAddress, to: NATIVE_TOKEN, data: appData },
+          ],
+        })) as string;
+
+        // Wait for approval to confirm
+        for (let i = 0; i < 60; i++) {
+          const rcpt = await fetch("https://testnet-rpc.monad.xyz/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "eth_getTransactionReceipt",
+              params: [appHash],
+            }),
+          });
+          const rcptJson = await rcpt.json();
+          if (rcptJson.result) break;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      } else {
+        setApproveSkipped(true);
+      }
+
+      // Step 2: Submit deposit transaction
+      setStep(2);
+      const txParams: Record<string, string> = {
+        from: depositorAddress,
+        to: poolAddress,
+        data: calldata,
+      };
+      if (value && value !== "0" && value !== "0x0") {
+        txParams.value = value.startsWith("0x")
+          ? value
+          : `0x${BigInt(value).toString(16)}`;
+      }
+      await provider.request({
+        method: "eth_sendTransaction",
+        params: [txParams],
+      });
+
+      // Step 3: Confirm deposit
+      setStep(3);
+      const confRes = await fetch(`${API_URL}/deposit/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relayId }),
+      });
+      const confData = await confRes.json();
+      if (!confRes.ok)
+        throw new Error(confData.error || confRes.statusText);
+
+      // Refresh balance
+      qc.invalidateQueries({ queryKey: ["balances", depositorAddress] });
+
+      setStage("done");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setStage("input");
+    } finally {
+      setSending(false);
+    }
   }
 
-  async function handleCopyAcct() {
-    if (!accountNumber) return;
-    await navigator.clipboard.writeText(accountNumber);
-    setCopiedAcct(true);
-    setTimeout(() => setCopiedAcct(false), 2000);
-  }
+  const STEPS = [
+    "Preparing deposit...",
+    "Approving token...",
+    "Submitting deposit...",
+    "Confirming on-chain...",
+  ];
+  const STEPS_DONE = [
+    "Deposit prepared",
+    approveSkipped ? "Already approved" : "Token approved",
+    "Deposit submitted",
+    "Deposit confirmed",
+  ];
 
   return (
     <div
@@ -1627,6 +1778,8 @@ function DepositModal({
           borderRadius: "24px 24px 0 0",
           padding: "28px 24px 40px",
           borderTop: `1px solid ${C.border}`,
+          maxHeight: "85%",
+          overflowY: "auto",
         }}
       >
         {/* Header */}
@@ -1635,12 +1788,39 @@ function DepositModal({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 24,
+            marginBottom: 20,
           }}
         >
-          <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>
-            Add Funds
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {mode !== "choose" && stage === "input" && (
+              <button
+                onClick={() => {
+                  setMode("choose");
+                  setErr("");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: C.textSecondary,
+                  cursor: "pointer",
+                  fontSize: 18,
+                  padding: 0,
+                  lineHeight: 1,
+                }}
+              >
+                ←
+              </button>
+            )}
+            <span
+              style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}
+            >
+              {stage === "done"
+                ? "Deposit Complete"
+                : stage === "processing"
+                  ? "Processing"
+                  : "Add Funds"}
+            </span>
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -1658,197 +1838,537 @@ function DepositModal({
           </button>
         </div>
 
-        {/* Account Reference Number */}
-        {accountNumber && (
-          <div
-            style={{
-              background: `linear-gradient(135deg, ${C.accent}12 0%, ${C.accent}06 100%)`,
-              border: `1px solid ${C.accent}22`,
-              borderRadius: 14,
-              padding: "16px",
-              marginBottom: 16,
-            }}
-          >
+        {/* ===== CHOOSE MODE ===== */}
+        {mode === "choose" && stage === "input" && (
+          <>
             <div
               style={{
-                color: C.textTertiary,
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
-                marginBottom: 6,
+                color: C.textSecondary,
+                fontSize: 14,
+                marginBottom: 20,
+                lineHeight: 1.5,
               }}
             >
-              Deposit Reference Number
+              Deposit{" "}
+              <strong style={{ color: C.textPrimary }}>USDC</strong> on{" "}
+              <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>{" "}
+              directly from your connected wallet.
             </div>
+
+            {/* My Account option */}
             <div
+              onClick={() => accountNumber && setMode("self")}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                background: C.bg,
+                border: `1px solid ${C.border}`,
+                borderRadius: 16,
+                padding: "20px",
+                marginBottom: 12,
+                cursor: accountNumber ? "pointer" : "not-allowed",
+                opacity: accountNumber ? 1 : 0.5,
+                transition: "border-color 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (accountNumber)
+                  (e.currentTarget as HTMLDivElement).style.borderColor =
+                    C.accent;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor =
+                  C.border;
               }}
             >
               <div
                 style={{
-                  color: C.accent,
-                  fontSize: 24,
-                  fontWeight: 800,
-                  letterSpacing: 2,
-                  fontFamily: "monospace",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
                 }}
               >
-                {accountNumber}
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: C.accentSoft,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 20,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon.Download />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      color: C.textPrimary,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    Deposit to My Account
+                  </div>
+                  <div
+                    style={{
+                      color: C.textTertiary,
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {accountNumber
+                      ? `Account #${accountNumber}`
+                      : "Account not yet set up"}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    color: C.textTertiary,
+                  }}
+                >
+                  <Icon.ArrowRight />
+                </div>
               </div>
-              <button
-                onClick={handleCopyAcct}
+            </div>
+
+            {/* Another Account option */}
+            <div
+              onClick={() => setMode("other")}
+              style={{
+                background: C.bg,
+                border: `1px solid ${C.border}`,
+                borderRadius: 16,
+                padding: "20px",
+                marginBottom: 20,
+                cursor: "pointer",
+                transition: "border-color 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor =
+                  C.accent;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor =
+                  C.border;
+              }}
+            >
+              <div
                 style={{
-                  background: C.accentSoft,
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "6px 12px",
-                  color: C.accent,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
                 }}
               >
-                {copiedAcct ? "Copied!" : "Copy"}
-              </button>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: C.greenSoft,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 20,
+                    color: C.green,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon.Send />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      color: C.textPrimary,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    Deposit to Another Account
+                  </div>
+                  <div
+                    style={{
+                      color: C.textTertiary,
+                      fontSize: 12,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Enter the recipient's account number
+                  </div>
+                </div>
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    color: C.textTertiary,
+                  }}
+                >
+                  <Icon.ArrowRight />
+                </div>
+              </div>
             </div>
-            <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 6 }}>
-              Include this reference when sending funds to ensure instant
-              credit.
+
+            {/* Network badge */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: C.accentSoft,
+                border: `1px solid ${C.accent}22`,
+                borderRadius: 8,
+                padding: "4px 10px",
+                fontSize: 12,
+                color: C.accent,
+                fontWeight: 600,
+              }}
+            >
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  background: C.green,
+                }}
+              />
+              Monad Testnet · Chain ID 10143
             </div>
-          </div>
+          </>
         )}
 
-        <div
-          style={{
-            color: C.textSecondary,
-            fontSize: 14,
-            marginBottom: 20,
-            lineHeight: 1.5,
-          }}
-        >
-          Send <strong style={{ color: C.textPrimary }}>USDC</strong> from
-          Rabby, MetaMask, or any wallet to the address below on{" "}
-          <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
-        </div>
+        {/* ===== INPUT STAGE ===== */}
+        {mode !== "choose" && stage === "input" && (
+          <>
+            {/* Account number */}
+            {mode === "self" ? (
+              <div
+                style={{
+                  background: `linear-gradient(135deg, ${C.accent}12 0%, ${C.accent}06 100%)`,
+                  border: `1px solid ${C.accent}22`,
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    color: C.textTertiary,
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    marginBottom: 4,
+                  }}
+                >
+                  Account Number
+                </div>
+                <div
+                  style={{
+                    color: C.accent,
+                    fontSize: 22,
+                    fontWeight: 800,
+                    letterSpacing: 2,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {accountNumber}
+                </div>
+              </div>
+            ) : (
+              <>
+                <label
+                  style={{
+                    color: C.textSecondary,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                    display: "block",
+                  }}
+                >
+                  Recipient Account Number
+                </label>
+                <input
+                  type="number"
+                  placeholder="Enter account number"
+                  value={otherAcctNum}
+                  onChange={(e) => setOtherAcctNum(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    background: C.bg,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 14,
+                    color: C.textPrimary,
+                    fontSize: 18,
+                    fontWeight: 600,
+                    fontFamily: "monospace",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    marginBottom: 16,
+                  }}
+                />
+              </>
+            )}
 
-        {/* Network badge */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: C.accentSoft,
-            border: `1px solid ${C.accent}22`,
-            borderRadius: 8,
-            padding: "4px 10px",
-            marginBottom: 16,
-            fontSize: 12,
-            color: C.accent,
-            fontWeight: 600,
-          }}
-        >
-          <div
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              background: C.green,
-            }}
-          />
-          Monad Testnet · Chain ID 10143
-        </div>
-
-        {/* Address box */}
-        {depositorAddress ? (
-          <div
-            style={{
-              background: C.bg,
-              border: `1px solid ${C.border}`,
-              borderRadius: 14,
-              padding: "16px",
-              marginBottom: 20,
-            }}
-          >
-            <div
+            {/* Amount */}
+            <label
               style={{
-                color: C.textTertiary,
-                fontSize: 11,
+                color: C.textSecondary,
+                fontSize: 12,
+                letterSpacing: 1,
                 textTransform: "uppercase",
-                letterSpacing: 0.5,
-                marginBottom: 8,
+                marginBottom: 6,
+                display: "block",
               }}
             >
-              Deposit Address
+              Amount (USDC)
+            </label>
+            <div style={{ position: "relative", marginBottom: 16 }}>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="0"
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textPrimary,
+                  fontSize: 22,
+                  fontWeight: 600,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
             </div>
+
+            {/* Info */}
             <div
               style={{
-                color: C.textPrimary,
-                fontSize: 13,
-                fontFamily: "monospace",
-                wordBreak: "break-all",
-                marginBottom: 14,
-                lineHeight: 1.6,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 6,
+                marginBottom: 16,
+                padding: "8px 12px",
+                background: C.accentSoft,
+                border: `1px solid rgba(108,92,231,0.18)`,
+                borderRadius: 10,
               }}
             >
-              {depositorAddress}
+              <span style={{ color: C.accent, fontSize: 13, marginTop: 1 }}>
+                ⓘ
+              </span>
+              <span
+                style={{ color: C.accent, fontSize: 12, lineHeight: 1.5 }}
+              >
+                {mode === "self"
+                  ? "USDC will be deposited from your connected wallet and credited to your account balance."
+                  : "USDC will be deposited from your connected wallet and credited to the recipient's account."}
+              </span>
             </div>
+
+            {err && (
+              <div
+                style={{
+                  background: C.redSoft,
+                  border: `1px solid rgba(229,51,74,0.2)`,
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  marginBottom: 16,
+                  color: C.red,
+                  fontSize: 13,
+                }}
+              >
+                {err}
+              </div>
+            )}
+
             <button
-              onClick={handleCopy}
+              onClick={handleDeposit}
+              disabled={sending || !amount || !targetAcctNum || !wallet}
               style={{
                 width: "100%",
-                padding: "13px",
-                background: copied ? C.greenSoft : C.accentSoft,
-                border: `1px solid ${copied ? C.green : C.accent}33`,
-                borderRadius: 12,
-                color: copied ? C.green : C.accent,
-                fontSize: 14,
+                padding: "16px",
+                background: C.green,
+                border: "none",
+                borderRadius: 16,
+                color: "#fff",
+                fontSize: 16,
                 fontWeight: 600,
                 cursor: "pointer",
-                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                opacity:
+                  sending || !amount || !targetAcctNum || !wallet ? 0.5 : 1,
               }}
             >
-              {copied ? "Copied!" : "Copy Address"}
+              <Icon.Download /> Deposit USDC
             </button>
-          </div>
-        ) : (
-          <div
-            style={{
-              background: C.redSoft,
-              borderRadius: 12,
-              padding: "12px 16px",
-              marginBottom: 20,
-              color: C.red,
-              fontSize: 13,
-            }}
-          >
-            No wallet address found.
-          </div>
+          </>
         )}
 
-        {/* Warning */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 8,
-            padding: "10px 14px",
-            background: C.yellowSoft,
-            border: `1px solid rgba(224,155,0,0.2)`,
-            borderRadius: 12,
-            fontSize: 12,
-            color: C.yellow,
-            lineHeight: 1.5,
-          }}
-        >
-          <span style={{ marginTop: 1 }}>ⓘ</span>
-          <span>
-            Only send USDC on Monad Testnet. Funds sent on other networks cannot
-            be recovered.
-          </span>
-        </div>
+        {/* ===== PROCESSING STAGE ===== */}
+        {stage === "processing" && (
+          <>
+            <div
+              style={{
+                textAlign: "center",
+                marginBottom: 24,
+                color: C.textSecondary,
+                fontSize: 13,
+              }}
+            >
+              {amount} USDC → Account #{targetAcctNum}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {STEPS.map((label, i) => {
+                const done = step > i;
+                const active = step === i;
+                return (
+                  <div key={i}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 0",
+                      }}
+                    >
+                      {/* Step indicator */}
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          background: done
+                            ? C.greenSoft
+                            : active
+                              ? C.accentSoft
+                              : C.bg,
+                          border: `2px solid ${done ? C.green : active ? C.accent : C.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: done
+                            ? C.green
+                            : active
+                              ? C.accent
+                              : C.textTertiary,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {done ? "✓" : i + 1}
+                      </div>
+                      <div>
+                        <div
+                          style={{
+                            color: done
+                              ? C.green
+                              : active
+                                ? C.textPrimary
+                                : C.textTertiary,
+                            fontSize: 13,
+                            fontWeight: active ? 600 : 400,
+                          }}
+                        >
+                          {done ? STEPS_DONE[i] : label}
+                        </div>
+                      </div>
+                      {active && (
+                        <div
+                          style={{
+                            marginLeft: "auto",
+                            width: 16,
+                            height: 16,
+                            border: `2px solid ${C.accent}`,
+                            borderTopColor: "transparent",
+                            borderRadius: "50%",
+                            animation: "spin 0.8s linear infinite",
+                          }}
+                        />
+                      )}
+                    </div>
+                    {/* Connector line */}
+                    {i < STEPS.length - 1 && (
+                      <div
+                        style={{
+                          width: 2,
+                          height: 12,
+                          background: done ? C.green : C.border,
+                          marginLeft: 13,
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          </>
+        )}
+
+        {/* ===== DONE STAGE ===== */}
+        {stage === "done" && (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  background: C.greenSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  fontSize: 26,
+                  color: C.green,
+                  fontWeight: 700,
+                }}
+              >
+                ✓
+              </div>
+              <div
+                style={{
+                  color: C.textPrimary,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                }}
+              >
+                Deposit Successful
+              </div>
+              <div style={{ color: C.textSecondary, fontSize: 13 }}>
+                {amount} USDC has been credited to Account #{targetAcctNum}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: "100%",
+                padding: "16px",
+                background: C.accent,
+                border: "none",
+                borderRadius: 16,
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Done
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
