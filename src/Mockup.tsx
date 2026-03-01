@@ -7,7 +7,7 @@ import {
   getEmbeddedConnectedWallet,
 } from "@privy-io/react-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { encodeFunctionData, keccak256, encodePacked } from "viem";
+import { encodeFunctionData } from "viem";
 import QRCode from "qrcode";
 
 const NATIVE_TOKEN = "0x7Dcd90Fe59D992CAA57dB69041B6cEEc9Db6E2af";
@@ -45,19 +45,6 @@ async function switchToMonad(provider: {
   }
 }
 
-const AUTHORIZE_SPEND_ABI = [
-  {
-    type: "function",
-    name: "authorizeSpend",
-    inputs: [
-      { name: "amount", type: "uint256" },
-      { name: "recipientHash", type: "bytes32" },
-      { name: "transferType", type: "uint8" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-] as const;
 
 const SPEND_INTERACTOR_READ_ABI = [
   {
@@ -692,8 +679,6 @@ function TransferModal({
     isMain: boolean;
   }[];
 }) {
-  const { wallets } = useWallets();
-  const wallet = wallets[0];
 
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
   const [fromCardIdx, setFromCardIdx] = useState(0);
@@ -751,10 +736,6 @@ function TransferModal({
       setErr("Account setup not yet complete.");
       return;
     }
-    if (!wallet) {
-      setErr("No wallet connected.");
-      return;
-    }
     setSending(true);
     setErr("");
     try {
@@ -764,25 +745,29 @@ function TransferModal({
         body: JSON.stringify({ address: recipient }),
       }).catch(() => {});
 
-      const recipientHash = keccak256(
-        encodePacked(["address"], [recipient as `0x${string}`]),
+      const token = await getAccessToken();
+      const res = await fetch(
+        `${API_URL}/users/${userAddress}/cards/${fromAddress}/spend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            amount: parseWei(amount),
+            recipient,
+            transferType: 1,
+          }),
+        },
       );
-      const calldata = encodeFunctionData({
-        abi: AUTHORIZE_SPEND_ABI,
-        functionName: "authorizeSpend",
-        args: [BigInt(parseWei(amount)), recipientHash, 1],
-      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(body?.error ?? res.statusText);
+      }
+      const { txHash: hash } = await res.json();
 
-      const provider = await wallet.getEthereumProvider();
-      await switchToMonad(provider);
-      const hash = await provider.request({
-        method: "eth_sendTransaction",
-        params: [
-          { from: fromAddress, to: spendInteractorAddress, data: calldata },
-        ],
-      });
-
-      setTxHash(hash as string);
+      setTxHash(hash);
       setStage("tracking");
       setWithdrawalStatus("pending");
     } catch (e) {
@@ -2875,33 +2860,17 @@ function AddCardModal({
   error,
 }: {
   onClose: () => void;
-  onAdd: (eoa: string, dailyLimit: string) => void;
+  onAdd: (dailyLimit: string) => void;
   registering: boolean;
   error: string;
 }) {
-  const [eoa, setEoa] = useState("");
   const [limit, setLimit] = useState(1000);
-  const [validationErr, setValidationErr] = useState("");
 
   function handleSubmit() {
-    if (!/^0x[0-9a-fA-F]{40}$/.test(eoa.trim())) {
-      setValidationErr("Enter a valid 0x wallet address (42 chars).");
-      return;
-    }
-    setValidationErr("");
-    onAdd(eoa.trim(), parseWei(limit.toString()));
+    onAdd(parseWei(limit.toString()));
   }
 
-  async function handlePaste() {
-    try {
-      const text = await navigator.clipboard.readText();
-      setEoa(text.trim());
-    } catch {
-      /* ignore */
-    }
-  }
-
-  const displayErr = validationErr || error;
+  const displayErr = error;
 
   return (
     <div
@@ -2954,62 +2923,6 @@ function AddCardModal({
             }}
           >
             ✕
-          </button>
-        </div>
-
-        {/* EOA address input */}
-        <label
-          style={{
-            color: C.textSecondary,
-            fontSize: 12,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            marginBottom: 6,
-            display: "block",
-          }}
-        >
-          Wallet Address
-        </label>
-        <div style={{ position: "relative", marginBottom: 20 }}>
-          <input
-            placeholder="0x..."
-            value={eoa}
-            onChange={(e) => {
-              setEoa(e.target.value);
-              setValidationErr("");
-            }}
-            style={{
-              width: "100%",
-              padding: "14px 52px 14px 16px",
-              background: C.bg,
-              border: `1px solid ${displayErr ? C.red : C.border}`,
-              borderRadius: 14,
-              color: C.textPrimary,
-              fontSize: 13,
-              fontFamily: "monospace",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-          <button
-            onClick={handlePaste}
-            title="Paste"
-            style={{
-              position: "absolute",
-              right: 10,
-              top: "50%",
-              transform: "translateY(-50%)",
-              background: C.accentSoft,
-              border: "none",
-              borderRadius: 8,
-              color: C.accent,
-              fontSize: 11,
-              fontWeight: 600,
-              padding: "4px 10px",
-              cursor: "pointer",
-            }}
-          >
-            Paste
           </button>
         </div>
 
@@ -3545,21 +3458,15 @@ export default function AnoBankMobileApp() {
   });
 
   const registerEoaMutation = useMutation({
-    mutationFn: async ({
-      eoa,
-      dailyLimit,
-    }: {
-      eoa: string;
-      dailyLimit: string;
-    }) => {
+    mutationFn: async ({ dailyLimit }: { dailyLimit: string }) => {
       const token = await getAccessToken();
-      const res = await fetch(`${API_URL}/users/${userAddress}/eoas`, {
+      const res = await fetch(`${API_URL}/users/${userAddress}/cards`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ eoa, dailyLimit, allowedTypes: [0, 1] }),
+        body: JSON.stringify({ dailyLimit, allowedTypes: [0, 1] }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -5884,8 +5791,8 @@ export default function AnoBankMobileApp() {
               card={selectedCard}
               isActive={selectedCard.isMain}
               onClose={() => setSelectedCardIdx(null)}
-              onRegister={(eoa, dailyLimit) =>
-                registerEoaMutation.mutate({ eoa, dailyLimit })
+              onRegister={(_eoa, dailyLimit) =>
+                registerEoaMutation.mutate({ dailyLimit })
               }
               registering={registerEoaMutation.isPending}
             />
@@ -5896,8 +5803,8 @@ export default function AnoBankMobileApp() {
                 setShowAddCard(false);
                 registerEoaMutation.reset();
               }}
-              onAdd={(eoa, dailyLimit) =>
-                registerEoaMutation.mutate({ eoa, dailyLimit })
+              onAdd={(dailyLimit) =>
+                registerEoaMutation.mutate({ dailyLimit })
               }
               registering={registerEoaMutation.isPending}
               error={dataError}
