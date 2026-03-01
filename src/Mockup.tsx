@@ -3953,9 +3953,31 @@ export default function AnoBankMobileApp() {
     const isDeposit = ev.type === "deposit";
     const isRefund = ev.type === "refund";
     const amt = ev.amount ? parseFloat(fmtWei(ev.amount, 18)) : 0;
+    const rawNote: string = ev.note ?? "";
+
+    // Derive a human-readable title and subtitle from the ledger note
+    let name = isDeposit ? "Deposit" : isRefund ? "Refund" : "Payment";
+    let subtitle = "";
+    if (!isDeposit && !isRefund) {
+      if (rawNote.startsWith("Path B transfer to ")) {
+        name = "Bank Transfer";
+        subtitle = shortenAddr(rawNote.replace("Path B transfer to ", ""), 4);
+      } else if (rawNote.startsWith("card payment to ")) {
+        name = "Card Payment";
+        subtitle = shortenAddr(rawNote.replace("card payment to ", ""), 4);
+      } else if (rawNote.startsWith("internal transfer to ")) {
+        name = "Transfer";
+        subtitle = rawNote.replace("internal transfer to ", "to ");
+      } else if (rawNote.startsWith("internal transfer from ")) {
+        name = "Transfer Received";
+        subtitle = rawNote.replace("internal transfer from ", "from ");
+      }
+    }
+
     return {
       type: ev.type as string,
-      name: isDeposit ? "Deposit" : isRefund ? "Refund" : "Payment",
+      name,
+      subtitle,
       amount: amt,
       date: ev.createdAt
         ? new Date(ev.createdAt).toLocaleDateString("en", {
@@ -3963,9 +3985,7 @@ export default function AnoBankMobileApp() {
             day: "numeric",
           })
         : "",
-      note: ev.note ?? "",
       txHash: ev.reference ?? "",
-      withdrawalStatus: ev.withdrawalStatus ?? null,
       isCredit: isDeposit || isRefund,
     };
   });
@@ -4265,7 +4285,7 @@ export default function AnoBankMobileApp() {
                       4.6% APY
                     </span>
                     <span style={{ color: C.textTertiary, fontSize: 12 }}>
-                      AnoBank Pool · native yield
+                      AnoBank · native yield
                     </span>
                   </div>
                 </div>
@@ -4862,9 +4882,7 @@ export default function AnoBankMobileApp() {
                             width: 34,
                             height: 34,
                             borderRadius: 10,
-                            background: tx.isCredit
-                              ? C.greenSoft
-                              : C.bg,
+                            background: tx.isCredit ? C.greenSoft : C.bg,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -4873,52 +4891,52 @@ export default function AnoBankMobileApp() {
                           }}
                         >
                           {tx.isCredit ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <line x1="12" y1="19" x2="12" y2="5" />
                               <polyline points="5 12 12 5 19 12" />
                             </svg>
                           ) : (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <line x1="5" y1="12" x2="19" y2="12" />
                               <polyline points="12 5 19 12 12 19" />
                             </svg>
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ color: C.textSecondary, fontSize: 13, fontWeight: 500 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: C.textPrimary,
+                                fontSize: 13,
+                                fontWeight: 600,
+                              }}
+                            >
                               {tx.name}
                             </span>
-                            {tx.withdrawalStatus && (
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  fontWeight: 600,
-                                  padding: "2px 6px",
-                                  borderRadius: 8,
-                                  background:
-                                    tx.withdrawalStatus === "done"
-                                      ? C.greenSoft
-                                      : tx.withdrawalStatus === "failed"
-                                        ? C.redSoft
-                                        : `${C.accent}15`,
-                                  color:
-                                    tx.withdrawalStatus === "done"
-                                      ? C.green
-                                      : tx.withdrawalStatus === "failed"
-                                        ? C.red
-                                        : C.accent,
-                                  textTransform: "uppercase" as const,
-                                  letterSpacing: 0.3,
-                                }}
-                              >
-                                {tx.withdrawalStatus === "done"
-                                  ? "Executed"
-                                  : tx.withdrawalStatus === "failed"
-                                    ? "Failed"
-                                    : "Pending"}
-                              </span>
-                            )}
                           </div>
                           <div
                             style={{
@@ -4930,7 +4948,7 @@ export default function AnoBankMobileApp() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {tx.date}{tx.note ? ` · ${tx.note}` : ""}
+                            {tx.subtitle ? `${tx.subtitle} · ` : ""}{tx.date}
                           </div>
                         </div>
                         <div
@@ -5636,52 +5654,52 @@ export default function AnoBankMobileApp() {
                           }}
                         >
                           {tx.isCredit ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <line x1="12" y1="19" x2="12" y2="5" />
                               <polyline points="5 12 12 5 19 12" />
                             </svg>
                           ) : (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <line x1="5" y1="12" x2="19" y2="12" />
                               <polyline points="12 5 19 12 12 19" />
                             </svg>
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span style={{ color: C.textSecondary, fontSize: 13, fontWeight: 500 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: C.textPrimary,
+                                fontSize: 13,
+                                fontWeight: 600,
+                              }}
+                            >
                               {tx.name}
                             </span>
-                            {tx.withdrawalStatus && (
-                              <span
-                                style={{
-                                  fontSize: 9,
-                                  fontWeight: 600,
-                                  padding: "2px 6px",
-                                  borderRadius: 8,
-                                  background:
-                                    tx.withdrawalStatus === "done"
-                                      ? C.greenSoft
-                                      : tx.withdrawalStatus === "failed"
-                                        ? C.redSoft
-                                        : `${C.accent}15`,
-                                  color:
-                                    tx.withdrawalStatus === "done"
-                                      ? C.green
-                                      : tx.withdrawalStatus === "failed"
-                                        ? C.red
-                                        : C.accent,
-                                  textTransform: "uppercase" as const,
-                                  letterSpacing: 0.3,
-                                }}
-                              >
-                                {tx.withdrawalStatus === "done"
-                                  ? "Executed"
-                                  : tx.withdrawalStatus === "failed"
-                                    ? "Failed"
-                                    : "Pending"}
-                              </span>
-                            )}
                           </div>
                           <div
                             style={{
@@ -5693,9 +5711,7 @@ export default function AnoBankMobileApp() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {tx.date}
-                            {tx.note ? ` · ${tx.note}` : ""}
-                            {tx.txHash ? ` · ${shortenAddr(tx.txHash, 4)}` : ""}
+                            {tx.subtitle ? `${tx.subtitle} · ` : ""}{tx.date}
                           </div>
                         </div>
                         <div
