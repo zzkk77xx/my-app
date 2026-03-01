@@ -3252,6 +3252,9 @@ export default function AnoBankMobileApp() {
     (wallets.find((w) => w.walletClientType !== "privy") ?? embeddedWallet)
       ?.address ?? null;
 
+  // Tracks which button triggered login — "signup" creates a Safe, "payment" skips it
+  const [loginIntent, setLoginIntent] = useState<"signup" | "payment" | null>(null);
+
   // Auto-create embedded wallet for email/social logins that don't have one yet
   const [creatingWallet, setCreatingWallet] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
@@ -3287,7 +3290,7 @@ export default function AnoBankMobileApp() {
       }
       return res.json() as Promise<{ safeAddress: string; created: boolean }>;
     },
-    enabled: authenticated && !!userAddress,
+    enabled: authenticated && !!userAddress && loginIntent !== "payment",
     staleTime: Infinity,
     retry: 3,
   });
@@ -3503,7 +3506,7 @@ export default function AnoBankMobileApp() {
         </div>
         <div style={{ width: "100%", maxWidth: 340 }}>
           <button
-            onClick={login}
+            onClick={() => { setLoginIntent("signup"); login(); }}
             style={{
               width: "100%",
               padding: "18px",
@@ -3517,7 +3520,24 @@ export default function AnoBankMobileApp() {
               marginBottom: 12,
             }}
           >
-            Connect Wallet
+            Sign Up
+          </button>
+          <button
+            onClick={() => { setLoginIntent("payment"); login(); }}
+            style={{
+              width: "100%",
+              padding: "18px",
+              background: "transparent",
+              border: `2px solid ${C.accent}`,
+              borderRadius: 18,
+              color: C.accent,
+              fontSize: 17,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginBottom: 12,
+            }}
+          >
+            Send Payment
           </button>
           <div
             style={{
