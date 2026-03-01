@@ -3233,6 +3233,7 @@ function CardModal({
     address: string;
     dailyLimit: string;
     remaining: string;
+    isBackendCard?: boolean;
   };
   isActive: boolean;
   onClose: () => void;
@@ -3394,7 +3395,7 @@ function CardModal({
             display: "block",
           }}
         >
-          Register daily spending limit
+          {card.isBackendCard ? "Update daily spending limit" : "Register daily spending limit"}
         </label>
         <div
           style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}
@@ -3451,7 +3452,9 @@ function CardModal({
               opacity: registering ? 0.5 : 1,
             }}
           >
-            {registering ? "Registering…" : "Save & Register"}
+            {registering
+              ? card.isBackendCard ? "Updating…" : "Registering…"
+              : card.isBackendCard ? "Update Limit" : "Save & Register"}
           </button>
           <button
             onClick={onClose}
@@ -3662,20 +3665,36 @@ export default function AnoBankMobileApp() {
     mutationFn: async ({
       eoa,
       dailyLimit,
+      update,
     }: {
       eoa?: string;
       dailyLimit: string;
+      update?: boolean; // true = PATCH existing card limit
     }) => {
       const token = await getAccessToken();
-      // If eoa is provided, register specific EOA via /eoas; otherwise create new card via /cards
-      const url = eoa
-        ? `${API_URL}/users/${userAddress}/eoas`
-        : `${API_URL}/users/${userAddress}/cards`;
-      const body = eoa
-        ? { eoa, dailyLimit, allowedTypes: [0, 1] }
-        : { dailyLimit, allowedTypes: [0, 1] };
+      let url: string;
+      let method: string;
+      let body: object;
+
+      if (update && eoa) {
+        // Update existing backend card's daily limit
+        url = `${API_URL}/users/${userAddress}/cards/${eoa}`;
+        method = "PATCH";
+        body = { dailyLimit };
+      } else if (eoa) {
+        // Register a manually-specified EOA
+        url = `${API_URL}/users/${userAddress}/eoas`;
+        method = "POST";
+        body = { eoa, dailyLimit, allowedTypes: [0, 1] };
+      } else {
+        // Create new backend-managed card
+        url = `${API_URL}/users/${userAddress}/cards`;
+        method = "POST";
+        body = { dailyLimit, allowedTypes: [0, 1] };
+      }
+
       const res = await fetch(url, {
-        method: "POST",
+        method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -6202,7 +6221,11 @@ export default function AnoBankMobileApp() {
               isActive={selectedCard.isMain}
               onClose={() => setSelectedCardIdx(null)}
               onRegister={(eoa, dailyLimit) =>
-                registerEoaMutation.mutate({ eoa, dailyLimit })
+                registerEoaMutation.mutate({
+                  eoa,
+                  dailyLimit,
+                  update: selectedCard?.isBackendCard ?? false,
+                })
               }
               registering={registerEoaMutation.isPending}
             />
