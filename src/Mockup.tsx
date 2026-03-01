@@ -3395,7 +3395,9 @@ function CardModal({
             display: "block",
           }}
         >
-          {card.isBackendCard ? "Update daily spending limit" : "Register daily spending limit"}
+          {card.isBackendCard
+            ? "Update daily spending limit"
+            : "Register daily spending limit"}
         </label>
         <div
           style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}
@@ -3453,8 +3455,12 @@ function CardModal({
             }}
           >
             {registering
-              ? card.isBackendCard ? "Updating…" : "Registering…"
-              : card.isBackendCard ? "Update Limit" : "Save & Register"}
+              ? card.isBackendCard
+                ? "Updating…"
+                : "Registering…"
+              : card.isBackendCard
+                ? "Update Limit"
+                : "Save & Register"}
           </button>
           <button
             onClick={onClose}
@@ -4844,7 +4850,7 @@ export default function AnoBankMobileApp() {
                       cursor: "pointer",
                       fontWeight: 500,
                     }}
-                    onClick={() => setTab("history")}
+                    onClick={() => setTab("credit")}
                   >
                     See all
                   </span>
@@ -4967,7 +4973,8 @@ export default function AnoBankMobileApp() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {tx.subtitle ? `${tx.subtitle} · ` : ""}{tx.date}
+                            {tx.subtitle ? `${tx.subtitle} · ` : ""}
+                            {tx.date}
                           </div>
                         </div>
                         <div
@@ -5588,165 +5595,96 @@ export default function AnoBankMobileApp() {
               </div>
             )}
 
-            {/* ===== HISTORY TAB ===== */}
-            {tab === "history" && (
+            {/* ===== CREDIT TAB ===== */}
+            {tab === "credit" && (
               <div style={{ padding: "68px 20px 20px" }}>
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 20,
+                    color: C.textPrimary,
+                    fontSize: 22,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                  }}
+                >
+                  Credit Score
+                </div>
+                <div
+                  style={{
+                    color: C.textSecondary,
+                    fontSize: 16,
+                    marginTop: 14,
+                    marginBottom: 14,
+                  }}
+                >
+                  Your on-chain credit score is computed from your transaction
+                  history, repayment behaviour, and account age. Consistent
+                  payments and a healthy balance push your score up; missed
+                  payments or low activity pull it down. The score unlocks
+                  credit opportunities.
+                </div>
+
+                {/* Score ring placeholder */}
+                <div
+                  style={{
+                    background: C.card,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 18,
+                    padding: "32px 20px",
+                    textAlign: "center",
+                    marginBottom: 16,
                   }}
                 >
                   <div
                     style={{
-                      color: C.textPrimary,
-                      fontSize: 22,
-                      fontWeight: 700,
+                      width: 120,
+                      height: 120,
+                      borderRadius: "50%",
+                      border: `6px solid ${C.border}`,
+                      margin: "0 auto 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: C.textTertiary,
+                      fontSize: 13,
                     }}
                   >
-                    History
+                    — / 850
                   </div>
+                  {/* <div style={{ color: C.textTertiary, fontSize: 12 }}>
+                    Score factors: payment history · balance · account age ·
+                    card usage
+                  </div> */}
                 </div>
 
-                {dataLoading && (
+                {/* COMING SOON banner */}
+                <div
+                  style={{
+                    background: C.accent,
+                    borderRadius: 14,
+                    padding: "20px 16px",
+                    textAlign: "center",
+                  }}
+                >
                   <div
                     style={{
-                      color: C.textTertiary,
-                      textAlign: "center",
-                      padding: "20px 0",
-                      fontSize: 14,
+                      color: "#fff",
+                      fontSize: 16,
+                      fontWeight: 900,
+                      letterSpacing: 2,
                     }}
                   >
-                    Loading…
+                    COMING SOON
                   </div>
-                )}
-
-                {!dataLoading && txRows.length === 0 && (
                   <div
                     style={{
-                      color: C.textTertiary,
-                      textAlign: "center",
-                      padding: "40px 0",
-                      fontSize: 14,
+                      color: "rgba(255,255,255,0.75)",
+                      fontSize: 12,
+                      marginTop: 6,
                     }}
                   >
-                    No transactions yet.
+                    We're building your credit profile in the background
                   </div>
-                )}
-
-                {txRows.length > 0 && (
-                  <div
-                    style={{
-                      background: C.card,
-                      borderRadius: 18,
-                      overflow: "hidden",
-                      border: `1px solid ${C.border}`,
-                    }}
-                  >
-                    {txRows.map((tx, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          padding: "14px 16px",
-                          borderBottom:
-                            i < txRows.length - 1
-                              ? `1px solid ${C.border}`
-                              : "none",
-                          gap: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 10,
-                            background: tx.isCredit ? C.greenSoft : C.bg,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            color: tx.isCredit ? C.green : C.textTertiary,
-                          }}
-                        >
-                          {tx.isCredit ? (
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <line x1="12" y1="19" x2="12" y2="5" />
-                              <polyline points="5 12 12 5 19 12" />
-                            </svg>
-                          ) : (
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <line x1="5" y1="12" x2="19" y2="12" />
-                              <polyline points="12 5 19 12 12 19" />
-                            </svg>
-                          )}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: C.textPrimary,
-                                fontSize: 13,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {tx.name}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              color: C.textTertiary,
-                              fontSize: 11,
-                              marginTop: 2,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {tx.subtitle ? `${tx.subtitle} · ` : ""}{tx.date}
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            color: tx.isCredit ? C.green : C.textSecondary,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {tx.isCredit ? "+" : "-"}${tx.amount.toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -6151,7 +6089,7 @@ export default function AnoBankMobileApp() {
               { id: "home", label: "Home", icon: <Icon.Home /> },
               { id: "cards", label: "Cards", icon: <Icon.Cards /> },
               { id: "transfer", label: "Send", icon: <Icon.Transfer /> },
-              { id: "history", label: "History", icon: <Icon.TrendUp /> },
+              { id: "credit", label: "Credit", icon: <Icon.TrendUp /> },
               { id: "defi", label: "DeFi", icon: <Icon.DeFi /> },
             ].map((t) => (
               <button
