@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import {
   usePrivy,
   useWallets,
-  useConnectWallet,
   useMfaEnrollment,
   useCreateWallet,
   getEmbeddedConnectedWallet,
@@ -1616,22 +1615,28 @@ function DepositModal({
   accountNumber: string | null;
 }) {
   const { wallets } = useWallets();
-  const { connectWallet } = useConnectWallet();
   const qc = useQueryClient();
 
   const [mode, setMode] = useState<"choose" | "self" | "other">("choose");
   const [amount, setAmount] = useState("");
   const [otherAcctNum, setOtherAcctNum] = useState("");
-  const [selectedWalletIdx, setSelectedWalletIdx] = useState(() => {
+  // Browser wallet (not linked to Privy account)
+  const [browserAddr, setBrowserAddr] = useState<string | null>(null);
+  const [browserProvider, setBrowserProvider] = useState<any>(null);
+  // "privy" = use a Privy wallet, "browser" = use injected browser wallet
+  const [walletSource, setWalletSource] = useState<"privy" | "browser">(
+    "privy",
+  );
+  const [selectedPrivyIdx, setSelectedPrivyIdx] = useState(() => {
     const idx = wallets.findIndex((w) => w.walletClientType !== "privy");
     return idx >= 0 ? idx : 0;
   });
 
-  // Re-default to external wallet if wallets populate after mount
   useEffect(() => {
     const idx = wallets.findIndex((w) => w.walletClientType !== "privy");
-    if (idx >= 0) setSelectedWalletIdx(idx);
+    if (idx >= 0) setSelectedPrivyIdx(idx);
   }, [wallets.length]);
+
   const [stage, setStage] = useState<
     "input" | "processing" | "failed" | "done"
   >("input");
@@ -1640,12 +1645,46 @@ function DepositModal({
   const [err, setErr] = useState("");
   const [sending, setSending] = useState(false);
 
-  const wallet = wallets[selectedWalletIdx] ?? wallets[0] ?? null;
-  const senderAddress = wallet?.address ?? null;
+  const privyWallet = wallets[selectedPrivyIdx] ?? wallets[0] ?? null;
+  const senderAddress =
+    walletSource === "browser" && browserAddr
+      ? browserAddr
+      : privyWallet?.address ?? null;
   const targetAcctNum = mode === "self" ? accountNumber : otherAcctNum;
 
+  async function connectBrowserWallet() {
+    const eth = (window as any).ethereum;
+    if (!eth) {
+      setErr("No browser wallet detected. Install Rabby or MetaMask.");
+      return;
+    }
+    try {
+      const accounts = (await eth.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      if (accounts.length > 0) {
+        setBrowserAddr(accounts[0]);
+        setBrowserProvider(eth);
+        setWalletSource("browser");
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Wallet connection rejected.");
+    }
+  }
+
+  async function getProvider() {
+    if (walletSource === "browser" && browserProvider) {
+      await switchToMonad(browserProvider);
+      return browserProvider;
+    }
+    if (!privyWallet) throw new Error("No wallet connected.");
+    const p = await privyWallet.getEthereumProvider();
+    await switchToMonad(p);
+    return p;
+  }
+
   async function handleDeposit() {
-    if (!senderAddress || !wallet || !amount || !targetAcctNum) return;
+    if (!senderAddress || !amount || !targetAcctNum) return;
     setSending(true);
     setErr("");
     setStage("processing");
@@ -1670,8 +1709,7 @@ function DepositModal({
 
       const { to: poolAddress, calldata, value, relayId } = prepData;
 
-      const provider = await wallet.getEthereumProvider();
-      await switchToMonad(provider);
+      const provider = await getProvider();
 
       // Step 1: Check allowance & approve if needed
       setStep(1);
@@ -2130,175 +2168,194 @@ function DepositModal({
             )}
 
             {/* Wallet selector */}
-            {wallets.length > 1 && (
-              <>
-                <label
-                  style={{
-                    color: C.textSecondary,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                    display: "block",
-                  }}
-                >
-                  Pay from wallet
-                </label>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    marginBottom: 16,
-                  }}
-                >
-                  {wallets.map((w, idx) => (
-                    <div
-                      key={w.address}
-                      onClick={() => setSelectedWalletIdx(idx)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "10px 14px",
-                        background:
-                          idx === selectedWalletIdx ? C.accentSoft : C.bg,
-                        border: `1.5px solid ${idx === selectedWalletIdx ? C.accent : C.border}`,
-                        borderRadius: 12,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 9,
-                          border: `2px solid ${idx === selectedWalletIdx ? C.accent : C.border}`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {idx === selectedWalletIdx && (
-                          <div
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              background: C.accent,
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            color: C.textPrimary,
-                            fontSize: 13,
-                            fontWeight: 500,
-                          }}
-                        >
-                          {w.walletClientType === "privy"
-                            ? "Embedded Wallet"
-                            : w.walletClientType
-                              ? w.walletClientType.charAt(0).toUpperCase() +
-                                w.walletClientType.slice(1)
-                              : "Wallet"}
-                        </div>
-                        <div
-                          style={{
-                            color: C.textTertiary,
-                            fontSize: 11,
-                            fontFamily: "monospace",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {shortenAddr(w.address, 6)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            {wallets.length === 1 && senderAddress && (
-              <div
-                style={{
-                  background: C.bg,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
-                  padding: "10px 14px",
-                  marginBottom: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <div
-                  style={{
-                    color: C.textTertiary,
-                    fontSize: 12,
-                  }}
-                >
-                  From:
-                </div>
-                <div
-                  style={{
-                    color: C.textPrimary,
-                    fontSize: 13,
-                    fontFamily: "monospace",
-                    fontWeight: 500,
-                  }}
-                >
-                  {shortenAddr(senderAddress, 6)}
-                </div>
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    background: C.accentSoft,
-                    borderRadius: 6,
-                    padding: "2px 8px",
-                    color: C.accent,
-                    fontSize: 10,
-                    fontWeight: 600,
-                  }}
-                >
-                  {wallet?.walletClientType === "privy"
-                    ? "Embedded"
-                    : wallet?.walletClientType
-                      ? wallet.walletClientType.charAt(0).toUpperCase() +
-                        wallet.walletClientType.slice(1)
-                      : "Wallet"}
-                </div>
-              </div>
-            )}
-
-            {/* Connect external wallet */}
-            <button
-              onClick={() => connectWallet()}
+            <label
               style={{
-                width: "100%",
-                padding: "10px 14px",
-                background: "none",
-                border: `1px dashed ${C.border}`,
-                borderRadius: 12,
-                color: C.accent,
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
+                color: C.textSecondary,
+                fontSize: 12,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                marginBottom: 6,
+                display: "block",
+              }}
+            >
+              Pay from wallet
+            </label>
+            <div
+              style={{
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                flexDirection: "column",
                 gap: 6,
                 marginBottom: 16,
               }}
             >
-              <Icon.Plus /> Connect Browser Wallet
-            </button>
+              {/* Browser wallet option */}
+              {browserAddr && (
+                <div
+                  onClick={() => setWalletSource("browser")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    background:
+                      walletSource === "browser" ? C.accentSoft : C.bg,
+                    border: `1.5px solid ${walletSource === "browser" ? C.accent : C.border}`,
+                    borderRadius: 12,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      border: `2px solid ${walletSource === "browser" ? C.accent : C.border}`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {walletSource === "browser" && (
+                      <div
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          background: C.accent,
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        color: C.textPrimary,
+                        fontSize: 13,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Browser Wallet
+                    </div>
+                    <div
+                      style={{
+                        color: C.textTertiary,
+                        fontSize: 11,
+                        fontFamily: "monospace",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {shortenAddr(browserAddr, 6)}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Privy wallet options */}
+              {wallets.map((w, idx) => {
+                const isSelected =
+                  walletSource === "privy" && idx === selectedPrivyIdx;
+                return (
+                  <div
+                    key={w.address}
+                    onClick={() => {
+                      setSelectedPrivyIdx(idx);
+                      setWalletSource("privy");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 14px",
+                      background: isSelected ? C.accentSoft : C.bg,
+                      border: `1.5px solid ${isSelected ? C.accent : C.border}`,
+                      borderRadius: 12,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        border: `2px solid ${isSelected ? C.accent : C.border}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isSelected && (
+                        <div
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            background: C.accent,
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          color: C.textPrimary,
+                          fontSize: 13,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {w.walletClientType === "privy"
+                          ? "Embedded Wallet"
+                          : w.walletClientType
+                            ? w.walletClientType.charAt(0).toUpperCase() +
+                              w.walletClientType.slice(1)
+                            : "Wallet"}
+                      </div>
+                      <div
+                        style={{
+                          color: C.textTertiary,
+                          fontSize: 11,
+                          fontFamily: "monospace",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {shortenAddr(w.address, 6)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Connect browser wallet */}
+            {!browserAddr && (
+              <button
+                onClick={connectBrowserWallet}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  background: "none",
+                  border: `1px dashed ${C.border}`,
+                  borderRadius: 12,
+                  color: C.accent,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  marginBottom: 16,
+                }}
+              >
+                <Icon.Plus /> Connect Browser Wallet
+              </button>
+            )}
 
             {/* Amount */}
             <label
