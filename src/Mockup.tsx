@@ -2292,32 +2292,6 @@ function DepositModal({
                 </div>
               </div>
             </div>
-
-            {/* Network badge */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: C.accentSoft,
-                border: `1px solid ${C.accent}22`,
-                borderRadius: 8,
-                padding: "4px 10px",
-                fontSize: 12,
-                color: C.accent,
-                fontWeight: 600,
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  background: C.green,
-                }}
-              />
-              Monad Testnet · Chain ID 10143
-            </div>
           </>
         )}
 
