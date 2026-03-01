@@ -10,11 +10,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { encodeFunctionData, keccak256, encodePacked } from "viem";
 import QRCode from "qrcode";
 
-const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+const NATIVE_TOKEN = "0x7Dcd90Fe59D992CAA57dB69041B6cEEc9Db6E2af";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const AAVE_LOGO = "https://cryptologos.cc/logos/aave-aave-logo.svg";
 const UNI_LOGO = "https://cryptologos.cc/logos/uniswap-uni-logo.svg";
-const TOKEN_DECIMALS = 18;
+const TOKEN_DECIMALS = 6;
 
 const MONAD_TESTNET = {
   chainId: "0x279F", // 10143
@@ -754,7 +754,7 @@ function TransferModal({
               From: Checking Account
             </div>
             <div style={{ color: C.textSecondary, fontSize: 12, marginTop: 1 }}>
-              {nativeBalance} MON available
+              ${nativeBalance} available
             </div>
           </div>
         </div>
@@ -856,7 +856,7 @@ function TransferModal({
         >
           <span style={{ color: C.yellow, fontSize: 13, marginTop: 1 }}>ⓘ</span>
           <span style={{ color: C.yellow, fontSize: 12, lineHeight: 1.5 }}>
-            Transfers above <strong>10,000 MON</strong> require bank compliance
+            Transfers above <strong>$10,000</strong> require bank compliance
             verification before processing.
           </span>
         </div>
@@ -1040,7 +1040,7 @@ function QRGeneratorModal({
             marginBottom: 6,
           }}
         >
-          Amount (MON) — optional
+          Amount — optional
         </label>
         <input
           value={amount}
@@ -1192,7 +1192,7 @@ function DepositModal({
             lineHeight: 1.5,
           }}
         >
-          Send <strong style={{ color: C.textPrimary }}>MON</strong> from Rabby,
+          Send <strong style={{ color: C.textPrimary }}>$</strong> from Rabby,
           MetaMask, or any wallet to this address on{" "}
           <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
         </div>
@@ -1308,7 +1308,7 @@ function DepositModal({
         >
           <span style={{ marginTop: 1 }}>ⓘ</span>
           <span>
-            Only send MON on Monad Testnet. Funds sent on other networks cannot
+            Only send USDC on Monad Testnet. Funds sent on other networks cannot
             be recovered.
           </span>
         </div>
@@ -1474,7 +1474,7 @@ function AddCardModal({
             display: "block",
           }}
         >
-          Daily spending limit (MON)
+          Daily spending limit
         </label>
         <div
           style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}
@@ -1712,7 +1712,7 @@ function CardModal({
               <span
                 style={{ color: C.textPrimary, fontSize: 13, fontWeight: 600 }}
               >
-                {spent.toFixed(4)} / {daily.toFixed(4)} MON
+                $ {spent.toFixed(4)} / {daily.toFixed(4)}
               </span>
             </div>
             <div
@@ -2407,7 +2407,7 @@ export default function S4bMobileApp() {
                     {balanceVisible
                       ? dataLoading
                         ? "···"
-                        : `${nativeBalance} MON`
+                        : `$${nativeBalance}`
                       : "•••••"}
                   </div>
                   <div
@@ -2756,7 +2756,7 @@ export default function S4bMobileApp() {
                             </span>
                             {daily > 0 && (
                               <span style={{ fontSize: 9, opacity: 0.7 }}>
-                                {daily.toFixed(2)} MON
+                                ${daily.toFixed(2)}
                               </span>
                             )}
                           </div>
@@ -3083,7 +3083,7 @@ export default function S4bMobileApp() {
                             flexShrink: 0,
                           }}
                         >
-                          -{tx.amount.toFixed(4)} MON
+                          -${tx.amount.toFixed(4)}
                         </div>
                       </div>
                     ))}
@@ -3136,7 +3136,7 @@ export default function S4bMobileApp() {
                     <span
                       style={{ color: C.red, fontSize: 15, fontWeight: 700 }}
                     >
-                      -{monthlySpent.toFixed(4)} MON
+                      -${monthlySpent.toFixed(4)}
                     </span>
                   </div>
                   <div
@@ -3189,7 +3189,7 @@ export default function S4bMobileApp() {
                   >
                     <div style={{ color: C.textTertiary, fontSize: 12 }}>
                       Your balance is held in the shared S4b spending pool —
-                      earning native yield on every MON.
+                      earning native yield on every $.
                     </div>
                   </div>
                 </div>
@@ -3472,7 +3472,7 @@ export default function S4bMobileApp() {
                             fontWeight: 700,
                           }}
                         >
-                          {card.isMain ? `${nativeBalance} MON` : "—"}
+                          {card.isMain ? `$${nativeBalance}` : "—"}
                         </div>
                       </div>
                       <div style={{ paddingLeft: 4, paddingRight: 4 }}>
@@ -3485,14 +3485,14 @@ export default function S4bMobileApp() {
                         >
                           <span style={{ color: C.textTertiary, fontSize: 11 }}>
                             {daily > 0
-                              ? `Spent ${spent.toFixed(4)} MON`
+                              ? `Spent ${spent.toFixed(4)} $`
                               : "No daily limit set"}
                           </span>
                           {daily > 0 && (
                             <span
                               style={{ color: C.textTertiary, fontSize: 11 }}
                             >
-                              Limit {daily.toFixed(4)} MON
+                              Limit {daily.toFixed(4)} $
                             </span>
                           )}
                         </div>
@@ -3692,7 +3692,7 @@ export default function S4bMobileApp() {
                             flexShrink: 0,
                           }}
                         >
-                          -{tx.amount.toFixed(4)} MON
+                          -{tx.amount.toFixed(4)} $
                         </div>
                       </div>
                     ))}
