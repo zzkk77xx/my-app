@@ -3389,11 +3389,10 @@ export default function AnoBankMobileApp() {
   const { showMfaEnrollmentModal } = useMfaEnrollment();
   const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
-  // Prefer external wallet; fall back to embedded wallet
+  // Use the embedded (Privy-managed) wallet as account identity
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
-  const userAddress: string | null =
-    (wallets.find((w) => w.walletClientType !== "privy") ?? embeddedWallet)
-      ?.address ?? null;
+  const userAddress: string | null = embeddedWallet?.address ?? null;
+
 
   // Tracks which button triggered login — "signup" creates a Safe, "payment" skips it
   const [loginIntent, setLoginIntent] = useState<"signup" | "payment" | null>(
