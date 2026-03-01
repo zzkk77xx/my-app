@@ -59,6 +59,38 @@ const AUTHORIZE_SPEND_ABI = [
   },
 ] as const;
 
+const SPEND_INTERACTOR_READ_ABI = [
+  {
+    type: "function",
+    name: "getDailyLimit",
+    inputs: [{ name: "eoa", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getRemainingLimit",
+    inputs: [{ name: "eoa", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
+async function rpcRead(to: string, data: string): Promise<string> {
+  const res = await fetch("https://testnet-rpc.monad.xyz/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to, data }, "latest"],
+    }),
+  });
+  const json = await res.json();
+  return json.result ?? "0x0";
+}
+
 // --- Color tokens ---
 const C = {
   bg: "#F4F6FA",
@@ -616,6 +648,7 @@ function TransferModal({
   nativeBalance,
   spendInteractorAddress,
   userAddress,
+  getAccessToken,
   initialRecipient = "",
   initialAmount = "",
 }: {
@@ -623,19 +656,61 @@ function TransferModal({
   nativeBalance: string;
   spendInteractorAddress: string | null;
   userAddress: string;
+  getAccessToken: () => Promise<string | null>;
   initialRecipient?: string;
   initialAmount?: string;
 }) {
   const { wallets } = useWallets();
   const wallet = wallets[0];
 
+  const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
+  const [stage, setStage] = useState<"input" | "tracking" | "rejected">(
+    "input",
+  );
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [pathBResult, setPathBResult] = useState<{
+    approved: boolean;
+    status: string;
+    reason?: string;
+    relayId?: string;
+  } | null>(null);
+  const [withdrawalStatus, setWithdrawalStatus] = useState("pending");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
 
-  async function handleSend() {
+  // Poll for withdrawal status after Path A authorization
+  useEffect(() => {
+    if (stage !== "tracking" || !txHash) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${API_URL}/events?contract=${spendInteractorAddress}&limit=50`,
+        );
+        if (res.ok) {
+          const evts = await res.json();
+          const match = evts.find(
+            (e: any) =>
+              (e.transactionHash ?? e.txHash)?.toLowerCase() ===
+              txHash.toLowerCase(),
+          );
+          if (match?.withdrawalStatus) {
+            setWithdrawalStatus(match.withdrawalStatus);
+            if (
+              match.withdrawalStatus === "done" ||
+              match.withdrawalStatus === "failed"
+            ) {
+              clearInterval(interval);
+            }
+          }
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [stage, txHash, spendInteractorAddress]);
+
+  async function handlePathA() {
     if (!amount || !recipient || sending) return;
     if (!spendInteractorAddress) {
       setErr("Account setup not yet complete.");
@@ -645,31 +720,24 @@ function TransferModal({
       setErr("No wallet connected.");
       return;
     }
-
     setSending(true);
     setErr("");
-    setTxHash(null);
     try {
-      // 1. Pre-register recipient mapping so the watcher can resolve the hash
       fetch(`${API_URL}/recipients/by-address`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: recipient }),
       }).catch(() => {});
 
-      // 2. recipientHash = keccak256(abi.encodePacked(address)) — matches Solidity
       const recipientHash = keccak256(
         encodePacked(["address"], [recipient as `0x${string}`]),
       );
-
-      // 3. Encode authorizeSpend(amount, recipientHash, transferType=1)
       const calldata = encodeFunctionData({
         abi: AUTHORIZE_SPEND_ABI,
         functionName: "authorizeSpend",
         args: [BigInt(parseWei(amount)), recipientHash, 1],
       });
 
-      // 4. EOA signs & submits the tx — msg.sender must be the registered EOA
       const provider = await wallet.getEthereumProvider();
       await switchToMonad(provider);
       const hash = await provider.request({
@@ -680,14 +748,62 @@ function TransferModal({
       });
 
       setTxHash(hash as string);
-      setAmount("");
-      setRecipient("");
+      setStage("tracking");
+      setWithdrawalStatus("pending");
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSending(false);
     }
   }
+
+  async function handlePathB() {
+    if (!amount || !recipient || sending) return;
+    setSending(true);
+    setErr("");
+    try {
+      const token = await getAccessToken();
+      fetch(`${API_URL}/recipients/by-address`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: recipient }),
+      }).catch(() => {});
+
+      const res = await fetch(`${API_URL}/transfer/propose`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          amount: parseWei(amount),
+          recipient,
+          transferType: 0,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || res.statusText);
+
+      setPathBResult(result);
+      if (result.status === "approved") {
+        setStage("tracking");
+        setWithdrawalStatus("done");
+      } else {
+        setStage("rejected");
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const statusLabel = (s: string) => {
+    if (s === "done") return "Transfer complete";
+    if (s === "failed") return "Execution failed";
+    if (s === "processing") return "Processing from pool...";
+    return "Waiting for execution...";
+  };
 
   return (
     <div
@@ -708,14 +824,17 @@ function TransferModal({
           borderRadius: "24px 24px 0 0",
           padding: "28px 24px 40px",
           borderTop: `1px solid ${C.border}`,
+          maxHeight: "85%",
+          overflowY: "auto",
         }}
       >
+        {/* Header */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 24,
+            marginBottom: 20,
           }}
         >
           <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>
@@ -738,190 +857,535 @@ function TransferModal({
           </button>
         </div>
 
-        <div
-          style={{
-            background: C.accentSoft,
-            borderRadius: 14,
-            padding: "12px 16px",
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div>
-            <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
-              From: Checking Account
+        {/* ===== INPUT STAGE ===== */}
+        {stage === "input" && (
+          <>
+            {/* Path A/B Toggle */}
+            <div
+              style={{
+                display: "flex",
+                gap: 0,
+                marginBottom: 20,
+                background: C.bg,
+                borderRadius: 12,
+                padding: 3,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              {[
+                {
+                  id: "pathA" as const,
+                  label: "Card Payment",
+                  sub: "On-chain auth",
+                },
+                {
+                  id: "pathB" as const,
+                  label: "Bank Transfer",
+                  sub: "Bank co-signs",
+                },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setMode(p.id)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 8px 8px",
+                    background: mode === p.id ? C.card : "transparent",
+                    border: "none",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    boxShadow:
+                      mode === p.id ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: mode === p.id ? C.textPrimary : C.textTertiary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {p.label}
+                  </div>
+                  <div
+                    style={{
+                      color: C.textTertiary,
+                      fontSize: 10,
+                      marginTop: 2,
+                    }}
+                  >
+                    {p.sub}
+                  </div>
+                </button>
+              ))}
             </div>
-            <div style={{ color: C.textSecondary, fontSize: 12, marginTop: 1 }}>
-              ${nativeBalance} available
+
+            {/* From account */}
+            <div
+              style={{
+                background: C.accentSoft,
+                borderRadius: 14,
+                padding: "12px 16px",
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <div>
+                <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
+                  From:{" "}
+                  {mode === "pathA" ? "Spending Card" : "Checking Account"}
+                </div>
+                <div
+                  style={{ color: C.textSecondary, fontSize: 12, marginTop: 1 }}
+                >
+                  ${nativeBalance} available
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <label
-          style={{
-            color: C.textSecondary,
-            fontSize: 12,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            marginBottom: 6,
-            display: "block",
-          }}
-        >
-          Recipient
-        </label>
-        <div style={{ position: "relative", marginBottom: 16 }}>
-          <input
-            placeholder="IBAN or wallet address"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "14px 16px",
-              background: C.bg,
-              border: `1px solid ${C.border}`,
-              borderRadius: 14,
-              color: C.textPrimary,
-              fontSize: 15,
-              outline: "none",
-              boxSizing: "border-box",
-              paddingRight: 120,
-            }}
-          />
-          <span
-            style={{
-              position: "absolute",
-              right: 14,
-              top: "50%",
-              transform: "translateY(-50%)",
-              fontSize: 12,
-              color: C.accent,
-              fontWeight: 600,
-              cursor: "not-allowed",
-              userSelect: "none",
-              letterSpacing: 0.2,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Scan QR code
-          </span>
-        </div>
+            {/* Recipient */}
+            <label
+              style={{
+                color: C.textSecondary,
+                fontSize: 12,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                marginBottom: 6,
+                display: "block",
+              }}
+            >
+              Recipient
+            </label>
+            <div style={{ position: "relative", marginBottom: 16 }}>
+              <input
+                placeholder="IBAN or wallet address"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textPrimary,
+                  fontSize: 15,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  paddingRight: 120,
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  right: 14,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  fontSize: 12,
+                  color: C.accent,
+                  fontWeight: 600,
+                  cursor: "not-allowed",
+                  userSelect: "none",
+                  letterSpacing: 0.2,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Scan QR code
+              </span>
+            </div>
 
-        <label
-          style={{
-            color: C.textSecondary,
-            fontSize: 12,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            marginBottom: 6,
-            display: "block",
-          }}
-        >
-          Amount
-        </label>
-        <div style={{ position: "relative", marginBottom: 16 }}>
-          <input
-            type="number"
-            placeholder="0.00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            min="0"
-            style={{
-              width: "100%",
-              padding: "14px 16px",
-              background: C.bg,
-              border: `1px solid ${C.border}`,
-              borderRadius: 14,
-              color: C.textPrimary,
-              fontSize: 22,
-              fontWeight: 600,
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
+            {/* Amount */}
+            <label
+              style={{
+                color: C.textSecondary,
+                fontSize: 12,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                marginBottom: 6,
+                display: "block",
+              }}
+            >
+              Amount
+            </label>
+            <div style={{ position: "relative", marginBottom: 16 }}>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="0"
+                style={{
+                  width: "100%",
+                  padding: "14px 16px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textPrimary,
+                  fontSize: 22,
+                  fontWeight: 600,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 6,
-            marginBottom: 16,
-            padding: "8px 12px",
-            background: C.yellowSoft,
-            border: `1px solid rgba(224,155,0,0.18)`,
-            borderRadius: 10,
-          }}
-        >
-          <span style={{ color: C.yellow, fontSize: 13, marginTop: 1 }}>ⓘ</span>
-          <span style={{ color: C.yellow, fontSize: 12, lineHeight: 1.5 }}>
-            Transfers above <strong>$10,000</strong> require bank compliance
-            verification before processing.
-          </span>
-        </div>
+            {/* Info notice */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 6,
+                marginBottom: 16,
+                padding: "8px 12px",
+                background: mode === "pathA" ? C.yellowSoft : C.accentSoft,
+                border: `1px solid ${mode === "pathA" ? "rgba(224,155,0,0.18)" : "rgba(108,92,231,0.18)"}`,
+                borderRadius: 10,
+              }}
+            >
+              <span
+                style={{
+                  color: mode === "pathA" ? C.yellow : C.accent,
+                  fontSize: 13,
+                  marginTop: 1,
+                }}
+              >
+                ⓘ
+              </span>
+              <span
+                style={{
+                  color: mode === "pathA" ? C.yellow : C.accent,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                {mode === "pathA" ? (
+                  "Your registered EOA signs the authorization on-chain. The backend executes from the pool."
+                ) : (
+                  <>
+                    The bank validates, co-signs, and executes. Transfers above{" "}
+                    <strong>$10,000</strong> require compliance review.
+                  </>
+                )}
+              </span>
+            </div>
 
-        {err && (
-          <div
-            style={{
-              background: C.redSoft,
-              border: `1px solid rgba(229,51,74,0.2)`,
-              borderRadius: 12,
-              padding: "10px 14px",
-              marginBottom: 16,
-              color: C.red,
-              fontSize: 13,
-            }}
-          >
-            {err}
-          </div>
+            {err && (
+              <div
+                style={{
+                  background: C.redSoft,
+                  border: `1px solid rgba(229,51,74,0.2)`,
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  marginBottom: 16,
+                  color: C.red,
+                  fontSize: 13,
+                }}
+              >
+                {err}
+              </div>
+            )}
+
+            <button
+              onClick={mode === "pathA" ? handlePathA : handlePathB}
+              disabled={sending || !amount || !recipient}
+              style={{
+                width: "100%",
+                padding: "16px",
+                background: C.accent,
+                border: "none",
+                borderRadius: 16,
+                color: "#fff",
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                opacity: sending || !amount || !recipient ? 0.5 : 1,
+              }}
+            >
+              <Icon.Send />{" "}
+              {sending
+                ? "Processing..."
+                : mode === "pathA"
+                  ? "Authorize Payment"
+                  : "Submit Transfer"}
+            </button>
+          </>
         )}
 
-        {txHash && (
-          <div
-            style={{
-              background: C.greenSoft,
-              border: `1px solid rgba(0,168,107,0.2)`,
-              borderRadius: 12,
-              padding: "10px 14px",
-              marginBottom: 16,
-              fontSize: 13,
-            }}
-          >
-            <div style={{ color: C.green, fontWeight: 600, marginBottom: 4 }}>
-              Transfer authorized on-chain
+        {/* ===== TRACKING STAGE (two-phase status) ===== */}
+        {stage === "tracking" && (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  background: C.greenSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  fontSize: 26,
+                }}
+              >
+                {withdrawalStatus === "done" ? "✓" : "⟳"}
+              </div>
+              <div
+                style={{
+                  color: C.textPrimary,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                }}
+              >
+                {withdrawalStatus === "done"
+                  ? "Transfer Complete"
+                  : "Transfer in Progress"}
+              </div>
+              <div style={{ color: C.textSecondary, fontSize: 13 }}>
+                {amount} $ to {shortenAddr(recipient, 6)}
+              </div>
             </div>
-            <div style={{ color: C.textSecondary, fontSize: 12 }}>
-              Tx: {shortenAddr(txHash, 10)}
+
+            {/* Phase 1: Authorization */}
+            <div
+              style={{
+                background: C.greenSoft,
+                border: "1px solid rgba(0,168,107,0.2)",
+                borderRadius: 14,
+                padding: "14px 16px",
+                marginBottom: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <span style={{ color: C.green, fontSize: 18, fontWeight: 700 }}>
+                ✓
+              </span>
+              <div>
+                <div style={{ color: C.green, fontSize: 13, fontWeight: 600 }}>
+                  Authorization Confirmed
+                </div>
+                <div
+                  style={{ color: C.textSecondary, fontSize: 11, marginTop: 2 }}
+                >
+                  {txHash
+                    ? `Tx: ${shortenAddr(txHash, 8)}`
+                    : pathBResult?.relayId
+                      ? `Relay: ${pathBResult.relayId.slice(0, 12)}...`
+                      : "Approved by bank"}
+                </div>
+              </div>
             </div>
-            <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 4 }}>
-              The backend is processing the transfer — funds will move shortly.
+
+            {/* Phase 2: Execution */}
+            <div
+              style={{
+                background:
+                  withdrawalStatus === "done"
+                    ? C.greenSoft
+                    : withdrawalStatus === "failed"
+                      ? C.redSoft
+                      : C.yellowSoft,
+                border: `1px solid ${withdrawalStatus === "done" ? "rgba(0,168,107,0.2)" : withdrawalStatus === "failed" ? "rgba(229,51,74,0.2)" : "rgba(224,155,0,0.2)"}`,
+                borderRadius: 14,
+                padding: "14px 16px",
+                marginBottom: 24,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <span
+                style={{
+                  color:
+                    withdrawalStatus === "done"
+                      ? C.green
+                      : withdrawalStatus === "failed"
+                        ? C.red
+                        : C.yellow,
+                  fontSize: 18,
+                  fontWeight: 700,
+                }}
+              >
+                {withdrawalStatus === "done"
+                  ? "✓"
+                  : withdrawalStatus === "failed"
+                    ? "✕"
+                    : "⟳"}
+              </span>
+              <div>
+                <div
+                  style={{
+                    color:
+                      withdrawalStatus === "done"
+                        ? C.green
+                        : withdrawalStatus === "failed"
+                          ? C.red
+                          : C.yellow,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  Execution
+                </div>
+                <div
+                  style={{ color: C.textSecondary, fontSize: 11, marginTop: 2 }}
+                >
+                  {statusLabel(withdrawalStatus)}
+                </div>
+              </div>
             </div>
-          </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: withdrawalStatus === "done" ? C.accent : C.bg,
+                border:
+                  withdrawalStatus === "done"
+                    ? "none"
+                    : `1px solid ${C.border}`,
+                borderRadius: 14,
+                color: withdrawalStatus === "done" ? "#fff" : C.textSecondary,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {withdrawalStatus === "done" ? "Done" : "Close"}
+            </button>
+          </>
         )}
 
-        <button
-          onClick={handleSend}
-          disabled={sending || !amount || !recipient}
-          style={{
-            width: "100%",
-            padding: "16px",
-            background: C.accent,
-            border: "none",
-            borderRadius: 16,
-            color: "#fff",
-            fontSize: 16,
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            opacity: sending || !amount || !recipient ? 0.5 : 1,
-          }}
-        >
-          <Icon.Send /> {sending ? "Sending…" : "Confirm Transfer"}
-        </button>
+        {/* ===== REJECTED STAGE ===== */}
+        {stage === "rejected" && (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  background: C.redSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  fontSize: 26,
+                }}
+              >
+                ✕
+              </div>
+              <div
+                style={{
+                  color: C.textPrimary,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                }}
+              >
+                Transfer Declined
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.redSoft,
+                border: "1px solid rgba(229,51,74,0.15)",
+                borderRadius: 14,
+                padding: "16px",
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  color: C.red,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                This transaction exceeds your spending limit.
+              </div>
+              <div
+                style={{
+                  color: C.textSecondary,
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {pathBResult?.reason ||
+                  "The bank's policy engine has declined this transfer."}
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                borderRadius: 14,
+                padding: "14px 16px",
+                marginBottom: 20,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              <div
+                style={{
+                  color: C.textSecondary,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                }}
+              >
+                Please contact your account manager for assistance or try a
+                smaller amount.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setStage("input");
+                  setPathBResult(null);
+                  setErr("");
+                }}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  background: C.accent,
+                  border: "none",
+                  borderRadius: 14,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textSecondary,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1121,17 +1585,27 @@ function QRGeneratorModal({
 function DepositModal({
   onClose,
   depositorAddress,
+  accountNumber,
 }: {
   onClose: () => void;
   depositorAddress: string | null;
+  accountNumber: string | null;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copiedAcct, setCopiedAcct] = useState(false);
 
   async function handleCopy() {
     if (!depositorAddress) return;
     await navigator.clipboard.writeText(depositorAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleCopyAcct() {
+    if (!accountNumber) return;
+    await navigator.clipboard.writeText(accountNumber);
+    setCopiedAcct(true);
+    setTimeout(() => setCopiedAcct(false), 2000);
   }
 
   return (
@@ -1184,6 +1658,69 @@ function DepositModal({
           </button>
         </div>
 
+        {/* Account Reference Number */}
+        {accountNumber && (
+          <div
+            style={{
+              background: `linear-gradient(135deg, ${C.accent}12 0%, ${C.accent}06 100%)`,
+              border: `1px solid ${C.accent}22`,
+              borderRadius: 14,
+              padding: "16px",
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                color: C.textTertiary,
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 6,
+              }}
+            >
+              Deposit Reference Number
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div
+                style={{
+                  color: C.accent,
+                  fontSize: 24,
+                  fontWeight: 800,
+                  letterSpacing: 2,
+                  fontFamily: "monospace",
+                }}
+              >
+                {accountNumber}
+              </div>
+              <button
+                onClick={handleCopyAcct}
+                style={{
+                  background: C.accentSoft,
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  color: C.accent,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {copiedAcct ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 6 }}>
+              Include this reference when sending funds to ensure instant
+              credit.
+            </div>
+          </div>
+        )}
+
         <div
           style={{
             color: C.textSecondary,
@@ -1192,8 +1729,8 @@ function DepositModal({
             lineHeight: 1.5,
           }}
         >
-          Send <strong style={{ color: C.textPrimary }}>$</strong> from Rabby,
-          MetaMask, or any wallet to this address on{" "}
+          Send <strong style={{ color: C.textPrimary }}>USDC</strong> from
+          Rabby, MetaMask, or any wallet to the address below on{" "}
           <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
         </div>
 
@@ -1930,6 +2467,62 @@ export default function S4bMobileApp() {
       return res.json() as Promise<any[]>;
     },
     enabled: !!spendInteractorAddress,
+    refetchInterval: 10_000,
+  });
+
+  // Account number for deposit reference
+  const { data: accountNumberData } = useQuery({
+    queryKey: ["accountNumber", userAddress],
+    queryFn: async () => {
+      const token = await getAccessToken();
+      const res = await fetch(
+        `${API_URL}/users/${userAddress}/account-number`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!res.ok) return { accountNumber: null };
+      return res.json() as Promise<{ accountNumber: string | null }>;
+    },
+    enabled: authenticated && !!userAddress,
+    staleTime: Infinity,
+  });
+
+  // EOA on-chain limits (daily limit + remaining)
+  const { data: eoaLimitsData } = useQuery({
+    queryKey: ["eoaLimits", spendInteractorAddress, eoas],
+    queryFn: async () => {
+      if (!spendInteractorAddress || eoas.length === 0) return {};
+      const limits: Record<string, { dailyLimit: string; remaining: string }> =
+        {};
+      for (const eoa of eoas) {
+        try {
+          const dailyData = encodeFunctionData({
+            abi: SPEND_INTERACTOR_READ_ABI,
+            functionName: "getDailyLimit",
+            args: [eoa as `0x${string}`],
+          });
+          const remainData = encodeFunctionData({
+            abi: SPEND_INTERACTOR_READ_ABI,
+            functionName: "getRemainingLimit",
+            args: [eoa as `0x${string}`],
+          });
+          const [dailyHex, remainHex] = await Promise.all([
+            rpcRead(spendInteractorAddress, dailyData),
+            rpcRead(spendInteractorAddress, remainData),
+          ]);
+          limits[eoa.toLowerCase()] = {
+            dailyLimit: dailyHex === "0x0" ? "0" : BigInt(dailyHex).toString(),
+            remaining: remainHex === "0x0" ? "0" : BigInt(remainHex).toString(),
+          };
+        } catch {
+          limits[eoa.toLowerCase()] = { dailyLimit: "0", remaining: "0" };
+        }
+      }
+      return limits;
+    },
+    enabled: !!spendInteractorAddress && eoas.length > 0,
+    refetchInterval: 30_000,
   });
 
   const registerEoaMutation = useMutation({
@@ -2156,7 +2749,10 @@ export default function S4bMobileApp() {
   ];
   const cards = allCardAddresses.map((addr, i) => {
     const meta = CARD_META[i % CARD_META.length];
-    const limits = { dailyLimit: "0", remaining: "0" };
+    const limits = eoaLimitsData?.[addr.toLowerCase()] ?? {
+      dailyLimit: "0",
+      remaining: "0",
+    };
     return {
       id: i,
       name: i === 0 ? "Main Account" : meta.name,
@@ -2178,6 +2774,7 @@ export default function S4bMobileApp() {
     recipient: ev.recipient ? shortenAddr(ev.recipient, 6) : "",
     nonce: ev.nonce ?? "",
     txHash: ev.transactionHash ?? ev.txHash ?? "",
+    withdrawalStatus: ev.withdrawalStatus ?? "pending",
   }));
 
   // Monthly stats
@@ -2424,10 +3021,10 @@ export default function S4bMobileApp() {
                     <span
                       style={{ color: C.green, fontSize: 13, fontWeight: 600 }}
                     >
-                      S4b Pool
+                      4.6% APY
                     </span>
                     <span style={{ color: C.textTertiary, fontSize: 12 }}>
-                      native yield
+                      S4b Pool · native yield
                     </span>
                   </div>
                 </div>
@@ -3054,12 +3651,48 @@ export default function S4bMobileApp() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              color: C.textSecondary,
-                              fontSize: 13,
-                              fontWeight: 500,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
                             }}
                           >
-                            {tx.name}
+                            <span
+                              style={{
+                                color: C.textSecondary,
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {tx.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 600,
+                                padding: "2px 6px",
+                                borderRadius: 8,
+                                background:
+                                  tx.withdrawalStatus === "done"
+                                    ? C.greenSoft
+                                    : tx.withdrawalStatus === "failed"
+                                      ? C.redSoft
+                                      : `${C.accent}15`,
+                                color:
+                                  tx.withdrawalStatus === "done"
+                                    ? C.green
+                                    : tx.withdrawalStatus === "failed"
+                                      ? C.red
+                                      : C.accent,
+                                textTransform: "uppercase",
+                                letterSpacing: 0.3,
+                              }}
+                            >
+                              {tx.withdrawalStatus === "done"
+                                ? "Executed"
+                                : tx.withdrawalStatus === "failed"
+                                  ? "Failed"
+                                  : "Pending"}
+                            </span>
                           </div>
                           <div
                             style={{
@@ -3662,12 +4295,48 @@ export default function S4bMobileApp() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              color: C.textSecondary,
-                              fontSize: 13,
-                              fontWeight: 500,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
                             }}
                           >
-                            {tx.name}
+                            <span
+                              style={{
+                                color: C.textSecondary,
+                                fontSize: 13,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {tx.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                fontWeight: 600,
+                                padding: "2px 6px",
+                                borderRadius: 8,
+                                background:
+                                  tx.withdrawalStatus === "done"
+                                    ? C.greenSoft
+                                    : tx.withdrawalStatus === "failed"
+                                      ? C.redSoft
+                                      : `${C.accent}15`,
+                                color:
+                                  tx.withdrawalStatus === "done"
+                                    ? C.green
+                                    : tx.withdrawalStatus === "failed"
+                                      ? C.red
+                                      : C.accent,
+                                textTransform: "uppercase",
+                                letterSpacing: 0.3,
+                              }}
+                            >
+                              {tx.withdrawalStatus === "done"
+                                ? "Executed"
+                                : tx.withdrawalStatus === "failed"
+                                  ? "Failed"
+                                  : "Pending"}
+                            </span>
                           </div>
                           <div
                             style={{
@@ -4144,6 +4813,7 @@ export default function S4bMobileApp() {
               nativeBalance={nativeBalance}
               spendInteractorAddress={spendInteractorAddress}
               userAddress={userAddress}
+              getAccessToken={getAccessToken}
               initialRecipient={qrPreset?.address ?? ""}
               initialAmount={qrPreset?.amount ?? ""}
             />
@@ -4162,6 +4832,7 @@ export default function S4bMobileApp() {
             <DepositModal
               onClose={() => setShowDeposit(false)}
               depositorAddress={userAddress}
+              accountNumber={accountNumberData?.accountNumber ?? null}
             />
           )}
           {selectedCard && (
