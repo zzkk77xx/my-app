@@ -8,6 +8,7 @@ import {
 } from "@privy-io/react-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { encodeFunctionData, keccak256, encodePacked } from "viem";
+import QRCode from "qrcode";
 
 const NATIVE_TOKEN = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -256,11 +257,11 @@ const Icon = {
   ),
   TrendUp: () => (
     <svg
-      width="14"
-      height="14"
+      width="22"
+      height="22"
       fill="none"
       viewBox="0 0 24 24"
-      stroke="#00A86B"
+      stroke="currentColor"
       strokeWidth="2.5"
     >
       <path
@@ -360,7 +361,9 @@ function QRScannerModal({
 
     async function start() {
       if (!("BarcodeDetector" in window)) {
-        setErr("QR scanning requires Chrome or Edge. Please try a different browser.");
+        setErr(
+          "QR scanning requires Chrome or Edge. Please try a different browser.",
+        );
         return;
       }
       try {
@@ -455,12 +458,28 @@ function QRScannerModal({
             color: "#fff",
           }}
         >
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E5334A" strokeWidth="1.5">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#E5334A"
+            strokeWidth="1.5"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          <p style={{ textAlign: "center", fontSize: 14, color: "rgba(255,255,255,0.8)", lineHeight: 1.5 }}>{err}</p>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: 14,
+              color: "rgba(255,255,255,0.8)",
+              lineHeight: 1.5,
+            }}
+          >
+            {err}
+          </p>
           <button
             onClick={onClose}
             style={{
@@ -483,10 +502,22 @@ function QRScannerModal({
             ref={videoRef}
             muted
             playsInline
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
           />
           {/* Viewfinder overlay */}
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+            }}
+          />
           <div
             style={{
               position: "absolute",
@@ -499,12 +530,41 @@ function QRScannerModal({
           >
             {/* Corner brackets */}
             {[
-              { top: 0, left: 0, borderTop: "3px solid #fff", borderLeft: "3px solid #fff" },
-              { top: 0, right: 0, borderTop: "3px solid #fff", borderRight: "3px solid #fff" },
-              { bottom: 0, left: 0, borderBottom: "3px solid #fff", borderLeft: "3px solid #fff" },
-              { bottom: 0, right: 0, borderBottom: "3px solid #fff", borderRight: "3px solid #fff" },
+              {
+                top: 0,
+                left: 0,
+                borderTop: "3px solid #fff",
+                borderLeft: "3px solid #fff",
+              },
+              {
+                top: 0,
+                right: 0,
+                borderTop: "3px solid #fff",
+                borderRight: "3px solid #fff",
+              },
+              {
+                bottom: 0,
+                left: 0,
+                borderBottom: "3px solid #fff",
+                borderLeft: "3px solid #fff",
+              },
+              {
+                bottom: 0,
+                right: 0,
+                borderBottom: "3px solid #fff",
+                borderRight: "3px solid #fff",
+              },
             ].map((s, i) => (
-              <div key={i} style={{ position: "absolute", width: 28, height: 28, borderRadius: 3, ...s }} />
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  width: 28,
+                  height: 28,
+                  borderRadius: 3,
+                  ...s,
+                }}
+              />
             ))}
           </div>
           {/* Label */}
@@ -884,12 +944,10 @@ function QRGeneratorModal({
     const data = amount.trim()
       ? JSON.stringify({ address: address.trim(), amount: amount.trim() })
       : address.trim() || " ";
-    import("qrcode").then((QRCode) => {
-      QRCode.toCanvas(canvasRef.current!, data, {
-        width: 220,
-        margin: 2,
-        color: { dark: "#0D1117", light: "#FFFFFF" },
-      });
+    QRCode.toCanvas(canvasRef.current!, data, {
+      width: 220,
+      margin: 2,
+      color: { dark: "#0D1117", light: "#FFFFFF" },
     });
   }, [address, amount]);
 
@@ -918,14 +976,38 @@ function QRGeneratorModal({
         }}
       >
         {/* Handle */}
-        <div style={{ width: 40, height: 4, background: C.border, borderRadius: 2, margin: "0 auto 20px" }} />
+        <div
+          style={{
+            width: 40,
+            height: 4,
+            background: C.border,
+            borderRadius: 2,
+            margin: "0 auto 20px",
+          }}
+        />
 
-        <div style={{ fontSize: 17, fontWeight: 700, color: C.textPrimary, marginBottom: 20 }}>
+        <div
+          style={{
+            fontSize: 17,
+            fontWeight: 700,
+            color: C.textPrimary,
+            marginBottom: 20,
+          }}
+        >
           Generate Payment QR
         </div>
 
         {/* Address */}
-        <label style={{ display: "block", fontSize: 11, color: C.textSecondary, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            color: C.textSecondary,
+            letterSpacing: 0.8,
+            textTransform: "uppercase",
+            marginBottom: 6,
+          }}
+        >
           Recipient Address
         </label>
         <input
@@ -948,7 +1030,16 @@ function QRGeneratorModal({
         />
 
         {/* Amount */}
-        <label style={{ display: "block", fontSize: 11, color: C.textSecondary, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 6 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: 11,
+            color: C.textSecondary,
+            letterSpacing: 0.8,
+            textTransform: "uppercase",
+            marginBottom: 6,
+          }}
+        >
           Amount (MON) — optional
         </label>
         <input
@@ -971,7 +1062,13 @@ function QRGeneratorModal({
         />
 
         {/* QR canvas */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 16,
+          }}
+        >
           <div
             style={{
               padding: 12,
@@ -986,7 +1083,14 @@ function QRGeneratorModal({
         </div>
 
         {/* Hint */}
-        <div style={{ textAlign: "center", color: C.textTertiary, fontSize: 11, marginBottom: 20 }}>
+        <div
+          style={{
+            textAlign: "center",
+            color: C.textTertiary,
+            fontSize: 11,
+            marginBottom: 20,
+          }}
+        >
           {isValidAddr
             ? "Scan with any wallet to pay"
             : "Enter a valid address to generate the QR code"}
@@ -1031,49 +1135,182 @@ function DepositModal({
   }
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(10px)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ background: C.card, borderRadius: "24px 24px 0 0", padding: "28px 24px 40px", borderTop: `1px solid ${C.border}` }}>
-
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 100,
+        background: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(10px)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        style={{
+          background: C.card,
+          borderRadius: "24px 24px 0 0",
+          padding: "28px 24px 40px",
+          borderTop: `1px solid ${C.border}`,
+        }}
+      >
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>Add Funds</span>
-          <button onClick={onClose} style={{ background: "rgba(0,0,0,0.06)", border: "none", color: C.textSecondary, width: 32, height: 32, borderRadius: 16, cursor: "pointer", fontSize: 16 }}>✕</button>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 24,
+          }}
+        >
+          <span style={{ color: C.textPrimary, fontSize: 20, fontWeight: 600 }}>
+            Add Funds
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(0,0,0,0.06)",
+              border: "none",
+              color: C.textSecondary,
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              cursor: "pointer",
+              fontSize: 16,
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <div style={{ color: C.textSecondary, fontSize: 14, marginBottom: 20, lineHeight: 1.5 }}>
-          Send <strong style={{ color: C.textPrimary }}>MON</strong> from Rabby, MetaMask, or any wallet to this address on <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
+        <div
+          style={{
+            color: C.textSecondary,
+            fontSize: 14,
+            marginBottom: 20,
+            lineHeight: 1.5,
+          }}
+        >
+          Send <strong style={{ color: C.textPrimary }}>MON</strong> from Rabby,
+          MetaMask, or any wallet to this address on{" "}
+          <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>.
         </div>
 
         {/* Network badge */}
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.accentSoft, border: `1px solid ${C.accent}22`, borderRadius: 8, padding: "4px 10px", marginBottom: 16, fontSize: 12, color: C.accent, fontWeight: 600 }}>
-          <div style={{ width: 6, height: 6, borderRadius: 3, background: C.green }} />
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: C.accentSoft,
+            border: `1px solid ${C.accent}22`,
+            borderRadius: 8,
+            padding: "4px 10px",
+            marginBottom: 16,
+            fontSize: 12,
+            color: C.accent,
+            fontWeight: 600,
+          }}
+        >
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              background: C.green,
+            }}
+          />
           Monad Testnet · Chain ID 10143
         </div>
 
         {/* Address box */}
         {depositorAddress ? (
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px", marginBottom: 20 }}>
-            <div style={{ color: C.textTertiary, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Deposit Address</div>
-            <div style={{ color: C.textPrimary, fontSize: 13, fontFamily: "monospace", wordBreak: "break-all", marginBottom: 14, lineHeight: 1.6 }}>
+          <div
+            style={{
+              background: C.bg,
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+              padding: "16px",
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                color: C.textTertiary,
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                marginBottom: 8,
+              }}
+            >
+              Deposit Address
+            </div>
+            <div
+              style={{
+                color: C.textPrimary,
+                fontSize: 13,
+                fontFamily: "monospace",
+                wordBreak: "break-all",
+                marginBottom: 14,
+                lineHeight: 1.6,
+              }}
+            >
               {depositorAddress}
             </div>
             <button
               onClick={handleCopy}
-              style={{ width: "100%", padding: "13px", background: copied ? C.greenSoft : C.accentSoft, border: `1px solid ${copied ? C.green : C.accent}33`, borderRadius: 12, color: copied ? C.green : C.accent, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
+              style={{
+                width: "100%",
+                padding: "13px",
+                background: copied ? C.greenSoft : C.accentSoft,
+                border: `1px solid ${copied ? C.green : C.accent}33`,
+                borderRadius: 12,
+                color: copied ? C.green : C.accent,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
             >
               {copied ? "Copied!" : "Copy Address"}
             </button>
           </div>
         ) : (
-          <div style={{ background: C.redSoft, borderRadius: 12, padding: "12px 16px", marginBottom: 20, color: C.red, fontSize: 13 }}>
+          <div
+            style={{
+              background: C.redSoft,
+              borderRadius: 12,
+              padding: "12px 16px",
+              marginBottom: 20,
+              color: C.red,
+              fontSize: 13,
+            }}
+          >
             No wallet address found.
           </div>
         )}
 
         {/* Warning */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", background: C.yellowSoft, border: `1px solid rgba(224,155,0,0.2)`, borderRadius: 12, fontSize: 12, color: C.yellow, lineHeight: 1.5 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            padding: "10px 14px",
+            background: C.yellowSoft,
+            border: `1px solid rgba(224,155,0,0.2)`,
+            borderRadius: 12,
+            fontSize: 12,
+            color: C.yellow,
+            lineHeight: 1.5,
+          }}
+        >
           <span style={{ marginTop: 1 }}>ⓘ</span>
-          <span>Only send MON on Monad Testnet. Funds sent on other networks cannot be recovered.</span>
+          <span>
+            Only send MON on Monad Testnet. Funds sent on other networks cannot
+            be recovered.
+          </span>
         </div>
       </div>
     </div>
@@ -1741,7 +1978,10 @@ export default function S4bMobileApp() {
   const [showDeposit, setShowDeposit] = useState(false);
   const [showAddCard, setShowAddCard] = useState(false);
   const [showQrScanner, setShowQrScanner] = useState(false);
-  const [qrPreset, setQrPreset] = useState<{ address: string; amount: string } | null>(null);
+  const [qrPreset, setQrPreset] = useState<{
+    address: string;
+    amount: string;
+  } | null>(null);
   const [showQrGenerator, setShowQrGenerator] = useState(false);
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(true);
@@ -1991,6 +2231,7 @@ export default function S4bMobileApp() {
               background: C.bg,
               borderRadius: "0 0 20px 20px",
               zIndex: 50,
+              pointerEvents: "none",
             }}
           />
           <div
@@ -2004,6 +2245,7 @@ export default function S4bMobileApp() {
               background: "#000",
               borderRadius: 22,
               zIndex: 51,
+              pointerEvents: "none",
             }}
           />
 
@@ -2140,7 +2382,7 @@ export default function S4bMobileApp() {
                       Total Balance
                     </span>
                     <button
-                      onClick={() => setBalanceVisible(!balanceVisible)}
+                      onClick={() => setBalanceVisible((b) => !b)}
                       style={{
                         background: "none",
                         border: "none",
@@ -2167,17 +2409,6 @@ export default function S4bMobileApp() {
                         : `${nativeBalance} MON`
                       : "•••••"}
                   </div>
-                  {safeAddress && (
-                    <div
-                      style={{
-                        color: C.textTertiary,
-                        fontSize: 11,
-                        marginBottom: 6,
-                      }}
-                    >
-                      Safe: {shortenAddr(safeAddress, 6)}
-                    </div>
-                  )}
                   <div
                     style={{
                       display: "inline-flex",
@@ -2311,15 +2542,19 @@ export default function S4bMobileApp() {
                     const expiry = cardExpiryFromAddr(card.address);
                     const colorA = card.color;
                     const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
+                    const daily = parseFloat(fmtWei(card.dailyLimit)) || 0;
+                    const rem = parseFloat(fmtWei(card.remaining)) || 0;
+                    const spent = Math.max(0, daily - rem);
+                    const pct =
+                      daily > 0 ? Math.min((spent / daily) * 100, 100) : 0;
                     return (
                       <div
                         key={card.id}
                         onClick={() => setSelectedCardIdx(card.id)}
                         style={{
                           minWidth: 230,
-                          height: 140,
                           borderRadius: 20,
-                          padding: "16px 18px",
+                          padding: "16px 18px 0",
                           background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
                           cursor: "pointer",
                           flexShrink: 0,
@@ -2330,44 +2565,221 @@ export default function S4bMobileApp() {
                         }}
                       >
                         {/* Decorative circles */}
-                        <div style={{ position: "absolute", top: -25, right: -25, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
-                        <div style={{ position: "absolute", bottom: -35, right: 15, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.05)", pointerEvents: "none" }} />
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: -25,
+                            right: -25,
+                            width: 110,
+                            height: 110,
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.08)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: 20,
+                            right: 15,
+                            width: 90,
+                            height: 90,
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.05)",
+                            pointerEvents: "none",
+                          }}
+                        />
 
                         {/* Top row: chip + scan */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                          {/* EMV chip */}
-                          <div style={{ width: 30, height: 22, borderRadius: 4, background: "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)", border: "1px solid rgba(255,255,255,0.4)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, padding: 4, boxSizing: "border-box" }}>
-                            {[0,1,2,3].map(i => <div key={i} style={{ background: "rgba(180,140,0,0.55)", borderRadius: 1 }} />)}
-                          </div>
-                          {/* Scan QR */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowQrScanner(true); }}
-                            style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, padding: "4px 9px", color: "#fff", fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, letterSpacing: 0.2 }}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 14,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 30,
+                              height: 22,
+                              borderRadius: 4,
+                              background:
+                                "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
+                              border: "1px solid rgba(255,255,255,0.4)",
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 2,
+                              padding: 4,
+                              boxSizing: "border-box",
+                            }}
                           >
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
-                              <rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/><rect x="14" y="18" width="3" height="0"/><rect x="18" y="14" width="0" height="3"/>
+                            {[0, 1, 2, 3].map((i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  background: "rgba(180,140,0,0.55)",
+                                  borderRadius: 1,
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowQrScanner(true);
+                            }}
+                            style={{
+                              background: "rgba(255,255,255,0.2)",
+                              border: "none",
+                              borderRadius: 8,
+                              padding: "4px 9px",
+                              color: "#fff",
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              letterSpacing: 0.2,
+                            }}
+                          >
+                            <svg
+                              width="10"
+                              height="10"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                            >
+                              <rect x="3" y="3" width="7" height="7" rx="1" />
+                              <rect x="14" y="3" width="7" height="7" rx="1" />
+                              <rect x="3" y="14" width="7" height="7" rx="1" />
+                              <rect
+                                x="14"
+                                y="14"
+                                width="3"
+                                height="3"
+                                rx="0.5"
+                              />
+                              <rect
+                                x="18"
+                                y="18"
+                                width="3"
+                                height="3"
+                                rx="0.5"
+                              />
                             </svg>
                             Scan QR
                           </button>
                         </div>
 
                         {/* Card number */}
-                        <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: 2.5, marginBottom: 12, opacity: 0.92, fontFamily: "monospace" }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 500,
+                            letterSpacing: 2.5,
+                            marginBottom: 12,
+                            opacity: 0.92,
+                            fontFamily: "monospace",
+                          }}
+                        >
                           {cardNum}
                         </div>
 
-                        {/* Bottom: name + expiry */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                        {/* Cardholder + expiry */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-end",
+                            marginBottom: 12,
+                          }}
+                        >
                           <div>
-                            <div style={{ fontSize: 8, opacity: 0.65, marginBottom: 2, letterSpacing: 0.8, textTransform: "uppercase" }}>Cardholder</div>
-                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>S4B USER</div>
+                            <div
+                              style={{
+                                fontSize: 8,
+                                opacity: 0.65,
+                                marginBottom: 2,
+                                letterSpacing: 0.8,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Cardholder
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                letterSpacing: 0.5,
+                              }}
+                            >
+                              S4B USER
+                            </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 8, opacity: 0.65, marginBottom: 2, letterSpacing: 0.8 }}>EXPIRES</div>
-                            <div style={{ fontSize: 11, fontWeight: 700 }}>{expiry}</div>
+                            <div
+                              style={{
+                                fontSize: 8,
+                                opacity: 0.65,
+                                marginBottom: 2,
+                                letterSpacing: 0.8,
+                              }}
+                            >
+                              EXPIRES
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700 }}>
+                              {expiry}
+                            </div>
                           </div>
                         </div>
+
+                        {/* Spending limit bar */}
+                        <div style={{ marginLeft: -18, marginRight: -18 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              paddingLeft: 18,
+                              paddingRight: 18,
+                              marginBottom: 5,
+                            }}
+                          >
+                            <span style={{ fontSize: 9, opacity: 0.7 }}>
+                              {daily > 0
+                                ? `${spent.toFixed(2)} spent`
+                                : "No limit set"}
+                            </span>
+                            {daily > 0 && (
+                              <span style={{ fontSize: 9, opacity: 0.7 }}>
+                                {daily.toFixed(2)} MON
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              height: 3,
+                              background: "rgba(255,255,255,0.2)",
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${pct}%`,
+                                background:
+                                  pct > 80
+                                    ? "#FF6B6B"
+                                    : "rgba(255,255,255,0.8)",
+                                transition: "width 0.6s ease",
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {/* bottom padding */}
+                        <div style={{ height: 14 }} />
                       </div>
                     );
                   })}
@@ -2603,7 +3015,8 @@ export default function S4bMobileApp() {
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          padding: "14px 16px",
+                          padding: "13px 16px",
+                          gap: 12,
                           borderBottom:
                             i < Math.min(txRows.length, 5) - 1
                               ? `1px solid ${C.border}`
@@ -2612,25 +3025,36 @@ export default function S4bMobileApp() {
                       >
                         <div
                           style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 12,
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
                             background: C.bg,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: 18,
-                            marginRight: 12,
                             flexShrink: 0,
+                            color: C.textTertiary,
                           }}
                         >
-                          {tx.icon}
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                          </svg>
                         </div>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              color: C.textPrimary,
-                              fontSize: 14,
+                              color: C.textSecondary,
+                              fontSize: 13,
                               fontWeight: 500,
                             }}
                           >
@@ -2640,7 +3064,10 @@ export default function S4bMobileApp() {
                             style={{
                               color: C.textTertiary,
                               fontSize: 11,
-                              marginTop: 1,
+                              marginTop: 2,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {tx.date}
@@ -2649,12 +3076,13 @@ export default function S4bMobileApp() {
                         </div>
                         <div
                           style={{
-                            color: C.textPrimary,
-                            fontSize: 14,
+                            color: C.textSecondary,
+                            fontSize: 13,
                             fontWeight: 600,
+                            flexShrink: 0,
                           }}
                         >
-                          {tx.amount.toFixed(4)} MON
+                          -{tx.amount.toFixed(4)} MON
                         </div>
                       </div>
                     ))}
@@ -2750,7 +3178,7 @@ export default function S4bMobileApp() {
                   <div
                     style={{
                       marginTop: 12,
-                      background: C.greenSoft,
+                      background: C.bg,
                       borderRadius: 12,
                       padding: "12px 14px",
                       display: "flex",
@@ -2758,7 +3186,7 @@ export default function S4bMobileApp() {
                       gap: 8,
                     }}
                   >
-                    <div style={{ color: C.green, fontSize: 12 }}>
+                    <div style={{ color: C.textTertiary, fontSize: 12 }}>
                       Your balance is held in the shared S4b spending pool —
                       earning native yield on every MON.
                     </div>
@@ -2785,136 +3213,312 @@ export default function S4bMobileApp() {
                   const rem = parseFloat(fmtWei(card.remaining)) || 0;
                   const spent = Math.max(0, daily - rem);
                   const pct = daily > 0 ? (spent / daily) * 100 : 0;
+                  const cardNum = cardNumberFromAddr(card.address);
+                  const expiry = cardExpiryFromAddr(card.address);
+                  const colorA = card.color;
+                  const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
                   return (
-                    <div
-                      key={card.id}
-                      onClick={() => setSelectedCardIdx(card.id)}
-                      style={{
-                        background: C.card,
-                        borderRadius: 20,
-                        padding: "20px",
-                        border: `1px solid ${card.isMain ? card.color : C.border}`,
-                        marginBottom: 14,
-                        cursor: "pointer",
-                      }}
-                    >
+                    <div key={card.id} style={{ marginBottom: 16 }}>
+                      {/* Credit card visual */}
                       <div
+                        onClick={() => setSelectedCardIdx(card.id)}
                         style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 16,
+                          width: "100%",
+                          height: 180,
+                          borderRadius: 22,
+                          padding: "20px 22px",
+                          background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
+                          cursor: "pointer",
+                          position: "relative",
+                          overflow: "hidden",
+                          boxShadow: `0 10px 30px ${colorA}44`,
+                          color: "#fff",
+                          boxSizing: "border-box",
+                          marginBottom: 10,
                         }}
                       >
+                        {/* Decorative circles */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: -30,
+                            right: -30,
+                            width: 140,
+                            height: 140,
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.08)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            bottom: -40,
+                            right: 20,
+                            width: 110,
+                            height: 110,
+                            borderRadius: "50%",
+                            background: "rgba(255,255,255,0.05)",
+                            pointerEvents: "none",
+                          }}
+                        />
+
+                        {/* Top row: chip + badges */}
                         <div
                           style={{
                             display: "flex",
+                            justifyContent: "space-between",
                             alignItems: "center",
-                            gap: 10,
+                            marginBottom: 20,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 34,
+                              height: 26,
+                              borderRadius: 5,
+                              background:
+                                "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
+                              border: "1px solid rgba(255,255,255,0.4)",
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 2,
+                              padding: 4,
+                              boxSizing: "border-box",
+                            }}
+                          >
+                            {[0, 1, 2, 3].map((i) => (
+                              <div
+                                key={i}
+                                style={{
+                                  background: "rgba(180,140,0,0.55)",
+                                  borderRadius: 1,
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            {card.isMain && (
+                              <div
+                                style={{
+                                  background: "rgba(255,255,255,0.25)",
+                                  borderRadius: 6,
+                                  padding: "2px 8px",
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                MAIN
+                              </div>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowQrScanner(true);
+                              }}
+                              style={{
+                                background: "rgba(255,255,255,0.2)",
+                                border: "none",
+                                borderRadius: 8,
+                                padding: "4px 9px",
+                                color: "#fff",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                letterSpacing: 0.2,
+                              }}
+                            >
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                              >
+                                <rect x="3" y="3" width="7" height="7" rx="1" />
+                                <rect
+                                  x="14"
+                                  y="3"
+                                  width="7"
+                                  height="7"
+                                  rx="1"
+                                />
+                                <rect
+                                  x="3"
+                                  y="14"
+                                  width="7"
+                                  height="7"
+                                  rx="1"
+                                />
+                                <rect
+                                  x="14"
+                                  y="14"
+                                  width="3"
+                                  height="3"
+                                  rx="0.5"
+                                />
+                                <rect
+                                  x="18"
+                                  y="18"
+                                  width="3"
+                                  height="3"
+                                  rx="0.5"
+                                />
+                              </svg>
+                              Scan QR
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Card number */}
+                        <div
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 500,
+                            letterSpacing: 3,
+                            marginBottom: 16,
+                            opacity: 0.92,
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          {cardNum}
+                        </div>
+
+                        {/* Bottom row */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-end",
                           }}
                         >
                           <div>
                             <div
                               style={{
-                                color: C.textPrimary,
-                                fontSize: 15,
-                                fontWeight: 600,
+                                fontSize: 9,
+                                opacity: 0.65,
+                                marginBottom: 3,
+                                letterSpacing: 0.8,
+                                textTransform: "uppercase",
                               }}
                             >
-                              {card.name}
+                              Cardholder
                             </div>
                             <div
-                              style={{ color: C.textTertiary, fontSize: 11 }}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                letterSpacing: 0.5,
+                              }}
                             >
-                              {shortenAddr(card.address, 6)}
+                              S4B USER
                             </div>
                           </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div
+                              style={{
+                                fontSize: 9,
+                                opacity: 0.65,
+                                marginBottom: 3,
+                                letterSpacing: 0.8,
+                              }}
+                            >
+                              EXPIRES
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 700 }}>
+                              {expiry}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Below card: name, balance, limit bar */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 6,
+                          paddingLeft: 4,
+                          paddingRight: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            color: C.textPrimary,
+                            fontSize: 14,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {card.name}
                         </div>
                         <div
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
+                            color: C.textPrimary,
+                            fontSize: 14,
+                            fontWeight: 700,
                           }}
                         >
-                          {card.isMain && (
-                            <div
-                              style={{
-                                background: C.greenSoft,
-                                color: C.green,
-                                fontSize: 10,
-                                fontWeight: 600,
-                                padding: "2px 8px",
-                                borderRadius: 6,
-                              }}
-                            >
-                              MAIN
-                            </div>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowQrScanner(true); }}
-                            style={{ background: C.accentSoft, border: "none", borderRadius: 8, padding: "5px 10px", color: C.accent, fontSize: 10, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
-                          >
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
-                              <rect x="14" y="14" width="3" height="3" rx="0.5"/><rect x="18" y="18" width="3" height="3" rx="0.5"/>
-                            </svg>
-                            Scan QR
-                          </button>
-                          <div style={{ color: C.textSecondary }}>
-                            <Icon.ArrowRight />
-                          </div>
+                          {card.isMain ? `${nativeBalance} MON` : "—"}
                         </div>
                       </div>
-                      <div
-                        style={{
-                          color: C.textPrimary,
-                          fontSize: 24,
-                          fontWeight: 700,
-                          marginBottom: 12,
-                        }}
-                      >
-                        {card.isMain ? `${nativeBalance} MON` : "—"}
-                      </div>
-                      {daily > 0 && (
-                        <>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              marginBottom: 6,
-                            }}
-                          >
+                      <div style={{ paddingLeft: 4, paddingRight: 4 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginBottom: 4,
+                          }}
+                        >
+                          <span style={{ color: C.textTertiary, fontSize: 11 }}>
+                            {daily > 0
+                              ? `Spent ${spent.toFixed(4)} MON`
+                              : "No daily limit set"}
+                          </span>
+                          {daily > 0 && (
                             <span
                               style={{ color: C.textTertiary, fontSize: 11 }}
                             >
-                              Spent: {spent.toFixed(4)}
+                              Limit {daily.toFixed(4)} MON
                             </span>
-                            <span
-                              style={{ color: C.textTertiary, fontSize: 11 }}
-                            >
-                              Daily limit: {daily.toFixed(4)} MON
-                            </span>
-                          </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            background: C.border,
+                            borderRadius: 4,
+                            height: 4,
+                            overflow: "hidden",
+                          }}
+                        >
                           <div
                             style={{
-                              background: C.bg,
+                              height: "100%",
                               borderRadius: 4,
-                              height: 6,
-                              overflow: "hidden",
+                              width: `${Math.min(pct, 100)}%`,
+                              background:
+                                pct > 80
+                                  ? C.red
+                                  : daily > 0
+                                    ? card.color
+                                    : C.border,
+                              transition: "width 0.6s ease",
                             }}
-                          >
-                            <div
-                              style={{
-                                height: "100%",
-                                borderRadius: 4,
-                                width: `${Math.min(pct, 100)}%`,
-                                background: pct > 80 ? C.red : card.color,
-                              }}
-                            />
-                          </div>
-                        </>
-                      )}
+                          />
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -3023,29 +3627,42 @@ export default function S4bMobileApp() {
                             i < txRows.length - 1
                               ? `1px solid ${C.border}`
                               : "none",
+                          gap: 12,
                         }}
                       >
+                        {/* Arrow icon */}
                         <div
                           style={{
-                            width: 38,
-                            height: 38,
-                            borderRadius: 12,
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
                             background: C.bg,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: 18,
-                            marginRight: 12,
                             flexShrink: 0,
+                            color: C.textTertiary,
                           }}
                         >
-                          {tx.icon}
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                          </svg>
                         </div>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div
                             style={{
-                              color: C.textPrimary,
-                              fontSize: 14,
+                              color: C.textSecondary,
+                              fontSize: 13,
                               fontWeight: 500,
                             }}
                           >
@@ -3056,21 +3673,25 @@ export default function S4bMobileApp() {
                               color: C.textTertiary,
                               fontSize: 11,
                               marginTop: 2,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {tx.date}
                             {tx.recipient && ` → ${tx.recipient}`}
-                            {tx.txHash && ` · ${shortenAddr(tx.txHash, 6)}`}
+                            {tx.txHash && ` · ${shortenAddr(tx.txHash, 4)}`}
                           </div>
                         </div>
                         <div
                           style={{
-                            color: C.textPrimary,
-                            fontSize: 14,
+                            color: C.textSecondary,
+                            fontSize: 13,
                             fontWeight: 600,
+                            flexShrink: 0,
                           }}
                         >
-                          {tx.amount.toFixed(4)} MON
+                          -{tx.amount.toFixed(4)} MON
                         </div>
                       </div>
                     ))}
@@ -3391,10 +4012,22 @@ export default function S4bMobileApp() {
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: C.textPrimary, fontSize: 14, fontWeight: 500 }}>
+                    <div
+                      style={{
+                        color: C.textPrimary,
+                        fontSize: 14,
+                        fontWeight: 500,
+                      }}
+                    >
                       Generate Payment QR
                     </div>
-                    <div style={{ color: C.textTertiary, fontSize: 11, marginTop: 1 }}>
+                    <div
+                      style={{
+                        color: C.textTertiary,
+                        fontSize: 11,
+                        marginTop: 1,
+                      }}
+                    >
                       Share your address as a scannable QR code
                     </div>
                   </div>
@@ -3559,7 +4192,10 @@ export default function S4bMobileApp() {
           {/* Modals */}
           {showTransfer && (
             <TransferModal
-              onClose={() => { setShowTransfer(false); setQrPreset(null); }}
+              onClose={() => {
+                setShowTransfer(false);
+                setQrPreset(null);
+              }}
               nativeBalance={nativeBalance}
               spendInteractorAddress={spendInteractorAddress}
               userAddress={userAddress}

@@ -80,7 +80,13 @@ export default function Wallet() {
   const [confirmClear, setConfirmClear] = useState(false);
 
   // ── Privy (unconditional)
-  const { ready: privyReady, authenticated, login, logout, getAccessToken } = usePrivy();
+  const {
+    ready: privyReady,
+    authenticated,
+    login,
+    logout,
+    getAccessToken,
+  } = usePrivy();
   const { wallets } = useWallets();
   const externalWallet = wallets[0];
 
@@ -181,7 +187,9 @@ export default function Wallet() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address: sendRecipient }),
-    }).catch(() => {/* best-effort, don't block the send */});
+    }).catch(() => {
+      /* best-effort, don't block the send */
+    });
     const token = sendToken === "custom" ? sendTokenCustom.trim() : sendToken;
     const amount = parseAmount(sendAmount, 18);
     const result = await send([{ token, recipient: sendRecipient, amount }]);
