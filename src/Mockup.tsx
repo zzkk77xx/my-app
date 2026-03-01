@@ -3584,11 +3584,11 @@ export default function AnoBankMobileApp() {
     (backendCardsData?.cards ?? []).map((c) => c.address.toLowerCase()),
   );
 
-  const { data: eventsData, isLoading: eventsLoading } = useQuery({
-    queryKey: ["events", spendInteractorAddress],
+  const { data: historyData, isLoading: eventsLoading } = useQuery({
+    queryKey: ["history", userAddress],
     queryFn: async () => {
       const res = await fetch(
-        `${API_URL}/events?contract=${spendInteractorAddress}&limit=50`,
+        `${API_URL}/users/${userAddress}/history?limit=50`,
       );
       if (!res.ok) {
         const b = await res.json().catch(() => ({ error: res.statusText }));
@@ -3596,7 +3596,7 @@ export default function AnoBankMobileApp() {
       }
       return res.json() as Promise<any[]>;
     },
-    enabled: !!spendInteractorAddress,
+    enabled: authenticated && !!userAddress,
     refetchInterval: 10_000,
   });
 
@@ -3696,7 +3696,7 @@ export default function AnoBankMobileApp() {
   // ── Derived
   const safeAddress = registrationData?.safeAddress ?? null;
   const balances = balancesData ?? {};
-  const events = eventsData ?? [];
+  const history = historyData ?? [];
   const dataLoading = balancesLoading || eoasLoading || eventsLoading;
   const dataError = registerEoaMutation.error
     ? String(registerEoaMutation.error)
@@ -3945,20 +3945,32 @@ export default function AnoBankMobileApp() {
     };
   });
 
-  // Events as transaction rows
-  const txRows = events.map((ev: any) => ({
-    name: "SpendAuthorized",
-    amount: ev.amount ? parseFloat(fmtWei(ev.amount, 18)) : 0,
-    date: ev.blockNumber ? `Block ${ev.blockNumber}` : "",
-    icon: "",
-    recipient: ev.recipient ? shortenAddr(ev.recipient, 6) : "",
-    nonce: ev.nonce ?? "",
-    txHash: ev.transactionHash ?? ev.txHash ?? "",
-    withdrawalStatus: ev.withdrawalStatus ?? "pending",
-  }));
+  // Unified activity rows
+  const txRows = history.map((ev: any) => {
+    const isDeposit = ev.type === "deposit";
+    const isRefund = ev.type === "refund";
+    const amt = ev.amount ? parseFloat(fmtWei(ev.amount, 18)) : 0;
+    return {
+      type: ev.type as string,
+      name: isDeposit ? "Deposit" : isRefund ? "Refund" : "Payment",
+      amount: amt,
+      date: ev.createdAt
+        ? new Date(ev.createdAt).toLocaleDateString("en", {
+            month: "short",
+            day: "numeric",
+          })
+        : "",
+      note: ev.note ?? "",
+      txHash: ev.reference ?? "",
+      withdrawalStatus: ev.withdrawalStatus ?? null,
+      isCredit: isDeposit || isRefund,
+    };
+  });
 
-  // Monthly stats
-  const monthlySpent = txRows.reduce((s, t) => s + t.amount, 0);
+  // Monthly stats (outgoing only)
+  const monthlySpent = txRows
+    .filter((t) => !t.isCredit)
+    .reduce((s, t) => s + t.amount, 0);
   const monthName = new Date().toLocaleString("en", { month: "long" });
 
   const selectedCard =
@@ -4847,73 +4859,63 @@ export default function AnoBankMobileApp() {
                             width: 34,
                             height: 34,
                             borderRadius: 10,
-                            background: C.bg,
+                            background: tx.isCredit
+                              ? C.greenSoft
+                              : C.bg,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
-                            color: C.textTertiary,
+                            color: tx.isCredit ? C.green : C.textTertiary,
                           }}
                         >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                            <polyline points="12 5 19 12 12 19" />
-                          </svg>
+                          {tx.isCredit ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="19" x2="12" y2="5" />
+                              <polyline points="5 12 12 5 19 12" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                              <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                          )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: C.textSecondary,
-                                fontSize: 13,
-                                fontWeight: 500,
-                              }}
-                            >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ color: C.textSecondary, fontSize: 13, fontWeight: 500 }}>
                               {tx.name}
                             </span>
-                            <span
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 600,
-                                padding: "2px 6px",
-                                borderRadius: 8,
-                                background:
-                                  tx.withdrawalStatus === "done"
-                                    ? C.greenSoft
-                                    : tx.withdrawalStatus === "failed"
-                                      ? C.redSoft
-                                      : `${C.accent}15`,
-                                color:
-                                  tx.withdrawalStatus === "done"
-                                    ? C.green
-                                    : tx.withdrawalStatus === "failed"
-                                      ? C.red
-                                      : C.accent,
-                                textTransform: "uppercase",
-                                letterSpacing: 0.3,
-                              }}
-                            >
-                              {tx.withdrawalStatus === "done"
-                                ? "Executed"
-                                : tx.withdrawalStatus === "failed"
-                                  ? "Failed"
-                                  : "Pending"}
-                            </span>
+                            {tx.withdrawalStatus && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 600,
+                                  padding: "2px 6px",
+                                  borderRadius: 8,
+                                  background:
+                                    tx.withdrawalStatus === "done"
+                                      ? C.greenSoft
+                                      : tx.withdrawalStatus === "failed"
+                                        ? C.redSoft
+                                        : `${C.accent}15`,
+                                  color:
+                                    tx.withdrawalStatus === "done"
+                                      ? C.green
+                                      : tx.withdrawalStatus === "failed"
+                                        ? C.red
+                                        : C.accent,
+                                  textTransform: "uppercase" as const,
+                                  letterSpacing: 0.3,
+                                }}
+                              >
+                                {tx.withdrawalStatus === "done"
+                                  ? "Executed"
+                                  : tx.withdrawalStatus === "failed"
+                                    ? "Failed"
+                                    : "Pending"}
+                              </span>
+                            )}
                           </div>
                           <div
                             style={{
@@ -4925,19 +4927,18 @@ export default function AnoBankMobileApp() {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {tx.date}
-                            {tx.recipient ? ` → ${tx.recipient}` : ""}
+                            {tx.date}{tx.note ? ` · ${tx.note}` : ""}
                           </div>
                         </div>
                         <div
                           style={{
-                            color: C.textSecondary,
+                            color: tx.isCredit ? C.green : C.textSecondary,
                             fontSize: 13,
                             fontWeight: 600,
                             flexShrink: 0,
                           }}
                         >
-                          -${tx.amount.toFixed(4)}
+                          {tx.isCredit ? "+" : "-"}${tx.amount.toFixed(2)}
                         </div>
                       </div>
                     ))}
@@ -5589,13 +5590,7 @@ export default function AnoBankMobileApp() {
                       fontSize: 14,
                     }}
                   >
-                    No SpendAuthorized events yet.
-                    {!spendInteractorAddress && (
-                      <div style={{ marginTop: 8, fontSize: 12 }}>
-                        Register an address to start tracking on-chain
-                        authorizations.
-                      </div>
-                    )}
+                    No transactions yet.
                   </div>
                 )}
 
@@ -5622,79 +5617,66 @@ export default function AnoBankMobileApp() {
                           gap: 12,
                         }}
                       >
-                        {/* Arrow icon */}
                         <div
                           style={{
                             width: 34,
                             height: 34,
                             borderRadius: 10,
-                            background: C.bg,
+                            background: tx.isCredit ? C.greenSoft : C.bg,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             flexShrink: 0,
-                            color: C.textTertiary,
+                            color: tx.isCredit ? C.green : C.textTertiary,
                           }}
                         >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                            <polyline points="12 5 19 12 12 19" />
-                          </svg>
+                          {tx.isCredit ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="19" x2="12" y2="5" />
+                              <polyline points="5 12 12 5 19 12" />
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                              <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                          )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: C.textSecondary,
-                                fontSize: 13,
-                                fontWeight: 500,
-                              }}
-                            >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ color: C.textSecondary, fontSize: 13, fontWeight: 500 }}>
                               {tx.name}
                             </span>
-                            <span
-                              style={{
-                                fontSize: 9,
-                                fontWeight: 600,
-                                padding: "2px 6px",
-                                borderRadius: 8,
-                                background:
-                                  tx.withdrawalStatus === "done"
-                                    ? C.greenSoft
-                                    : tx.withdrawalStatus === "failed"
-                                      ? C.redSoft
-                                      : `${C.accent}15`,
-                                color:
-                                  tx.withdrawalStatus === "done"
-                                    ? C.green
-                                    : tx.withdrawalStatus === "failed"
-                                      ? C.red
-                                      : C.accent,
-                                textTransform: "uppercase",
-                                letterSpacing: 0.3,
-                              }}
-                            >
-                              {tx.withdrawalStatus === "done"
-                                ? "Executed"
-                                : tx.withdrawalStatus === "failed"
-                                  ? "Failed"
-                                  : "Pending"}
-                            </span>
+                            {tx.withdrawalStatus && (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 600,
+                                  padding: "2px 6px",
+                                  borderRadius: 8,
+                                  background:
+                                    tx.withdrawalStatus === "done"
+                                      ? C.greenSoft
+                                      : tx.withdrawalStatus === "failed"
+                                        ? C.redSoft
+                                        : `${C.accent}15`,
+                                  color:
+                                    tx.withdrawalStatus === "done"
+                                      ? C.green
+                                      : tx.withdrawalStatus === "failed"
+                                        ? C.red
+                                        : C.accent,
+                                  textTransform: "uppercase" as const,
+                                  letterSpacing: 0.3,
+                                }}
+                              >
+                                {tx.withdrawalStatus === "done"
+                                  ? "Executed"
+                                  : tx.withdrawalStatus === "failed"
+                                    ? "Failed"
+                                    : "Pending"}
+                              </span>
+                            )}
                           </div>
                           <div
                             style={{
@@ -5707,19 +5689,19 @@ export default function AnoBankMobileApp() {
                             }}
                           >
                             {tx.date}
-                            {tx.recipient && ` → ${tx.recipient}`}
-                            {tx.txHash && ` · ${shortenAddr(tx.txHash, 4)}`}
+                            {tx.note ? ` · ${tx.note}` : ""}
+                            {tx.txHash ? ` · ${shortenAddr(tx.txHash, 4)}` : ""}
                           </div>
                         </div>
                         <div
                           style={{
-                            color: C.textSecondary,
+                            color: tx.isCredit ? C.green : C.textSecondary,
                             fontSize: 13,
                             fontWeight: 600,
                             flexShrink: 0,
                           }}
                         >
-                          -{tx.amount.toFixed(4)} $
+                          {tx.isCredit ? "+" : "-"}${tx.amount.toFixed(2)}
                         </div>
                       </div>
                     ))}
