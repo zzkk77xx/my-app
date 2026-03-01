@@ -2452,6 +2452,8 @@ export default function S4bMobileApp() {
     enabled: authenticated && !!userAddress,
   });
 
+  const eoas = eoasData?.eoas ?? [];
+
   const spendInteractorAddress = eoasData?.spendInteractorAddress ?? null;
 
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
@@ -2558,7 +2560,6 @@ export default function S4bMobileApp() {
   // ── Derived
   const safeAddress = registrationData?.safeAddress ?? null;
   const balances = balancesData ?? {};
-  const eoas = eoasData?.eoas ?? [];
   const events = eventsData ?? [];
   const dataLoading = balancesLoading || eoasLoading || eventsLoading;
   const dataError = registerEoaMutation.error
