@@ -1620,7 +1620,16 @@ function DepositModal({
   const [mode, setMode] = useState<"choose" | "self" | "other">("choose");
   const [amount, setAmount] = useState("");
   const [otherAcctNum, setOtherAcctNum] = useState("");
-  const [selectedWalletIdx, setSelectedWalletIdx] = useState(0);
+  const [selectedWalletIdx, setSelectedWalletIdx] = useState(() => {
+    const idx = wallets.findIndex((w) => w.walletClientType !== "privy");
+    return idx >= 0 ? idx : 0;
+  });
+
+  // Re-default to external wallet if wallets populate after mount
+  useEffect(() => {
+    const idx = wallets.findIndex((w) => w.walletClientType !== "privy");
+    if (idx >= 0) setSelectedWalletIdx(idx);
+  }, [wallets.length]);
   const [stage, setStage] = useState<
     "input" | "processing" | "failed" | "done"
   >("input");
