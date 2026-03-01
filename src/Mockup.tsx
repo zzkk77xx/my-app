@@ -672,14 +672,15 @@ function TransferModal({
     color: string;
     address: string;
     isMain: boolean;
+    isBackendCard?: boolean;
     dailyLimit: string;
     remaining: string;
   }[];
   initialRecipient?: string;
   initialAmount?: string;
 }) {
-  // Only show backend-generated spending cards (main account has no stored key)
-  const spendingCards = cards.filter((c) => !c.isMain);
+  // Only show backend-managed cards (private key stored server-side)
+  const spendingCards = cards.filter((c) => c.isBackendCard);
 
   const [selectedCardIdx, setSelectedCardIdx] = useState(0);
   const selectedCard =
@@ -3543,6 +3544,22 @@ export default function AnoBankMobileApp() {
 
   const spendInteractorAddress = eoasData?.spendInteractorAddress ?? null;
 
+  // Backend-managed cards (private keys stored server-side, usable for Path A)
+  const { data: backendCardsData } = useQuery({
+    queryKey: ["cards", userAddress],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/users/${userAddress}/cards`);
+      if (!res.ok) return { cards: [] };
+      return res.json() as Promise<{
+        cards: { address: string; dailyLimit: string }[];
+      }>;
+    },
+    enabled: authenticated && !!userAddress,
+  });
+  const backendCardAddresses = new Set(
+    (backendCardsData?.cards ?? []).map((c) => c.address.toLowerCase()),
+  );
+
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", spendInteractorAddress],
     queryFn: async () => {
@@ -3646,6 +3663,7 @@ export default function AnoBankMobileApp() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["eoas", userAddress] });
+      qc.invalidateQueries({ queryKey: ["cards", userAddress] });
       setSelectedCardIdx(null);
       setShowAddCard(false);
     },
@@ -3878,6 +3896,7 @@ export default function AnoBankMobileApp() {
       color: i === 0 ? C.accent : meta.color,
       address: addr,
       isMain: i === 0,
+      isBackendCard: backendCardAddresses.has(addr.toLowerCase()),
       dailyLimit: limits.dailyLimit,
       remaining: limits.remaining,
     };
