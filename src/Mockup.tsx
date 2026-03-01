@@ -341,7 +341,7 @@ function fmtWei(wei: string | undefined, decimals = TOKEN_DECIMALS): string {
     const divisor = BigInt(10 ** decimals);
     const whole = n / divisor;
     const frac = n % divisor;
-    const fracStr = frac.toString().padStart(decimals, "0").slice(0, 4);
+    const fracStr = frac.toString().padStart(decimals, "0").slice(0, 2);
     return `${whole}.${fracStr}`;
   } catch {
     return "0";
@@ -2741,7 +2741,7 @@ export default function S4bMobileApp() {
   }
 
   // ── Derived data
-  const nativeBalance = fmtWei(balances["usd"]);
+  const nativeBalance = fmtWei(balances["usd"], 18); // stored as 18 decimals in DB
 
   // Cards: user address first, then EOAs
   const allCardAddresses = [
