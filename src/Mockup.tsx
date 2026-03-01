@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   usePrivy,
   useWallets,
+  useConnectWallet,
   useMfaEnrollment,
   useCreateWallet,
   getEmbeddedConnectedWallet,
@@ -1615,6 +1616,7 @@ function DepositModal({
   accountNumber: string | null;
 }) {
   const { wallets } = useWallets();
+  const { connectWallet } = useConnectWallet();
   const qc = useQueryClient();
 
   const [mode, setMode] = useState<"choose" | "self" | "other">("choose");
@@ -2230,7 +2232,7 @@ function DepositModal({
                   border: `1px solid ${C.border}`,
                   borderRadius: 12,
                   padding: "10px 14px",
-                  marginBottom: 16,
+                  marginBottom: 8,
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
@@ -2274,6 +2276,29 @@ function DepositModal({
                 </div>
               </div>
             )}
+
+            {/* Connect external wallet */}
+            <button
+              onClick={() => connectWallet()}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                background: "none",
+                border: `1px dashed ${C.border}`,
+                borderRadius: 12,
+                color: C.accent,
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                marginBottom: 16,
+              }}
+            >
+              <Icon.Plus /> Connect Browser Wallet
+            </button>
 
             {/* Amount */}
             <label
