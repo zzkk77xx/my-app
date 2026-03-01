@@ -1615,22 +1615,26 @@ function DepositModal({
   accountNumber: string | null;
 }) {
   const { wallets } = useWallets();
-  const wallet = wallets[0];
   const qc = useQueryClient();
 
   const [mode, setMode] = useState<"choose" | "self" | "other">("choose");
   const [amount, setAmount] = useState("");
   const [otherAcctNum, setOtherAcctNum] = useState("");
-  const [stage, setStage] = useState<"input" | "processing" | "done">("input");
+  const [selectedWalletIdx, setSelectedWalletIdx] = useState(0);
+  const [stage, setStage] = useState<
+    "input" | "processing" | "failed" | "done"
+  >("input");
   const [step, setStep] = useState(0);
   const [approveSkipped, setApproveSkipped] = useState(false);
   const [err, setErr] = useState("");
   const [sending, setSending] = useState(false);
 
+  const wallet = wallets[selectedWalletIdx] ?? wallets[0] ?? null;
+  const senderAddress = wallet?.address ?? null;
   const targetAcctNum = mode === "self" ? accountNumber : otherAcctNum;
 
   async function handleDeposit() {
-    if (!depositorAddress || !wallet || !amount || !targetAcctNum) return;
+    if (!senderAddress || !wallet || !amount || !targetAcctNum) return;
     setSending(true);
     setErr("");
     setStage("processing");
@@ -1643,7 +1647,7 @@ function DepositModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          depositor: depositorAddress,
+          depositor: senderAddress,
           token: NATIVE_TOKEN,
           amount: parseWei(amount),
           accountNumber: parseInt(targetAcctNum),
@@ -1665,7 +1669,7 @@ function DepositModal({
         abi: ERC20_ABI,
         functionName: "allowance",
         args: [
-          depositorAddress as `0x${string}`,
+          senderAddress as `0x${string}`,
           poolAddress as `0x${string}`,
         ],
       });
@@ -1682,7 +1686,7 @@ function DepositModal({
         const appHash = (await provider.request({
           method: "eth_sendTransaction",
           params: [
-            { from: depositorAddress, to: NATIVE_TOKEN, data: appData },
+            { from: senderAddress, to: NATIVE_TOKEN, data: appData },
           ],
         })) as string;
 
@@ -1709,7 +1713,7 @@ function DepositModal({
       // Step 2: Submit deposit transaction
       setStep(2);
       const txParams: Record<string, string> = {
-        from: depositorAddress,
+        from: senderAddress,
         to: poolAddress,
         data: calldata,
       };
@@ -1740,7 +1744,7 @@ function DepositModal({
       setStage("done");
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-      setStage("input");
+      setStage("failed");
     } finally {
       setSending(false);
     }
@@ -1816,9 +1820,11 @@ function DepositModal({
             >
               {stage === "done"
                 ? "Deposit Complete"
-                : stage === "processing"
-                  ? "Processing"
-                  : "Add Funds"}
+                : stage === "failed"
+                  ? "Deposit Failed"
+                  : stage === "processing"
+                    ? "Processing"
+                    : "Add Funds"}
             </span>
           </div>
           <button
@@ -2112,6 +2118,154 @@ function DepositModal({
               </>
             )}
 
+            {/* Wallet selector */}
+            {wallets.length > 1 && (
+              <>
+                <label
+                  style={{
+                    color: C.textSecondary,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                    display: "block",
+                  }}
+                >
+                  Pay from wallet
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    marginBottom: 16,
+                  }}
+                >
+                  {wallets.map((w, idx) => (
+                    <div
+                      key={w.address}
+                      onClick={() => setSelectedWalletIdx(idx)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 14px",
+                        background:
+                          idx === selectedWalletIdx ? C.accentSoft : C.bg,
+                        border: `1.5px solid ${idx === selectedWalletIdx ? C.accent : C.border}`,
+                        borderRadius: 12,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 9,
+                          border: `2px solid ${idx === selectedWalletIdx ? C.accent : C.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {idx === selectedWalletIdx && (
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              background: C.accent,
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            color: C.textPrimary,
+                            fontSize: 13,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {w.walletClientType === "privy"
+                            ? "Embedded Wallet"
+                            : w.walletClientType
+                              ? w.walletClientType.charAt(0).toUpperCase() +
+                                w.walletClientType.slice(1)
+                              : "Wallet"}
+                        </div>
+                        <div
+                          style={{
+                            color: C.textTertiary,
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {shortenAddr(w.address, 6)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {wallets.length === 1 && senderAddress && (
+              <div
+                style={{
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    color: C.textTertiary,
+                    fontSize: 12,
+                  }}
+                >
+                  From:
+                </div>
+                <div
+                  style={{
+                    color: C.textPrimary,
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                    fontWeight: 500,
+                  }}
+                >
+                  {shortenAddr(senderAddress, 6)}
+                </div>
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    background: C.accentSoft,
+                    borderRadius: 6,
+                    padding: "2px 8px",
+                    color: C.accent,
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  {wallet?.walletClientType === "privy"
+                    ? "Embedded"
+                    : wallet?.walletClientType
+                      ? wallet.walletClientType.charAt(0).toUpperCase() +
+                        wallet.walletClientType.slice(1)
+                      : "Wallet"}
+                </div>
+              </div>
+            )}
+
             {/* Amount */}
             <label
               style={{
@@ -2190,7 +2344,7 @@ function DepositModal({
 
             <button
               onClick={handleDeposit}
-              disabled={sending || !amount || !targetAcctNum || !wallet}
+              disabled={sending || !amount || !targetAcctNum || !senderAddress}
               style={{
                 width: "100%",
                 padding: "16px",
@@ -2206,7 +2360,9 @@ function DepositModal({
                 justifyContent: "center",
                 gap: 8,
                 opacity:
-                  sending || !amount || !targetAcctNum || !wallet ? 0.5 : 1,
+                  sending || !amount || !targetAcctNum || !senderAddress
+                    ? 0.5
+                    : 1,
               }}
             >
               <Icon.Download /> Deposit USDC
@@ -2313,6 +2469,191 @@ function DepositModal({
               })}
             </div>
             <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          </>
+        )}
+
+        {/* ===== FAILED STAGE ===== */}
+        {stage === "failed" && (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  background: C.redSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  fontSize: 26,
+                  color: C.red,
+                  fontWeight: 700,
+                }}
+              >
+                ✕
+              </div>
+              <div
+                style={{
+                  color: C.textPrimary,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  marginBottom: 4,
+                }}
+              >
+                Deposit Failed
+              </div>
+              <div style={{ color: C.textSecondary, fontSize: 13 }}>
+                {amount} USDC → Account #{targetAcctNum}
+              </div>
+            </div>
+
+            {/* Stepper showing which step failed */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0,
+                marginBottom: 20,
+              }}
+            >
+              {STEPS.map((label, i) => {
+                const done = step > i;
+                const failed = step === i;
+                return (
+                  <div key={i}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "8px 0",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          background: done
+                            ? C.greenSoft
+                            : failed
+                              ? C.redSoft
+                              : C.bg,
+                          border: `2px solid ${done ? C.green : failed ? C.red : C.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: done
+                            ? C.green
+                            : failed
+                              ? C.red
+                              : C.textTertiary,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {done ? "✓" : failed ? "✕" : i + 1}
+                      </div>
+                      <div
+                        style={{
+                          color: done
+                            ? C.green
+                            : failed
+                              ? C.red
+                              : C.textTertiary,
+                          fontSize: 12,
+                          fontWeight: failed ? 600 : 400,
+                        }}
+                      >
+                        {done ? STEPS_DONE[i] : failed ? `Failed: ${label.replace("...", "")}` : label.replace("...", "")}
+                      </div>
+                    </div>
+                    {i < STEPS.length - 1 && (
+                      <div
+                        style={{
+                          width: 2,
+                          height: 8,
+                          background: done ? C.green : C.border,
+                          marginLeft: 11,
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Error reason */}
+            <div
+              style={{
+                background: C.redSoft,
+                border: "1px solid rgba(229,51,74,0.15)",
+                borderRadius: 14,
+                padding: "14px 16px",
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  color: C.red,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Error Details
+              </div>
+              <div
+                style={{
+                  color: C.textSecondary,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  wordBreak: "break-word",
+                }}
+              >
+                {err || "An unknown error occurred."}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setStage("input");
+                  setErr("");
+                }}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  background: C.accent,
+                  border: "none",
+                  borderRadius: 14,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Try Again
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textSecondary,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
           </>
         )}
 
