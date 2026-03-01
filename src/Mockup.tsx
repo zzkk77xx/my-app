@@ -674,6 +674,7 @@ function TransferModal({
   getAccessToken,
   initialRecipient = "",
   initialAmount = "",
+  cards = [],
 }: {
   onClose: () => void;
   nativeBalance: string;
@@ -682,11 +683,21 @@ function TransferModal({
   getAccessToken: () => Promise<string | null>;
   initialRecipient?: string;
   initialAmount?: string;
+  cards?: {
+    id: number;
+    name: string;
+    emoji: string;
+    color: string;
+    address: string;
+    isMain: boolean;
+  }[];
 }) {
   const { wallets } = useWallets();
   const wallet = wallets[0];
 
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
+  const [fromCardIdx, setFromCardIdx] = useState(0);
+  const fromAddress = cards[fromCardIdx]?.address ?? userAddress;
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [stage, setStage] = useState<"input" | "tracking" | "rejected">(
@@ -702,6 +713,7 @@ function TransferModal({
   const [withdrawalStatus, setWithdrawalStatus] = useState("pending");
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
 
   // Poll for withdrawal status after Path A authorization
   useEffect(() => {
@@ -766,7 +778,7 @@ function TransferModal({
       const hash = await provider.request({
         method: "eth_sendTransaction",
         params: [
-          { from: userAddress, to: spendInteractorAddress, data: calldata },
+          { from: fromAddress, to: spendInteractorAddress, data: calldata },
         ],
       });
 
@@ -951,21 +963,64 @@ function TransferModal({
                 borderRadius: 14,
                 padding: "12px 16px",
                 marginBottom: 16,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
               }}
             >
-              <div>
-                <div style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}>
-                  From:{" "}
+              <div
+                style={{
+                  color: C.accent,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                From
+              </div>
+              {cards.length > 0 ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <select
+                    value={fromCardIdx}
+                    onChange={(e) => setFromCardIdx(Number(e.target.value))}
+                    style={{
+                      width: "100%",
+                      background: C.bg,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      color: C.textPrimary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      padding: "8px 10px",
+                      cursor: "pointer",
+                      outline: "none",
+                    }}
+                  >
+                    {cards.map((c, i) => (
+                      <option key={c.address} value={i}>
+                        {c.emoji} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div
+                    style={{
+                      color: C.textTertiary,
+                      fontSize: 11,
+                      fontFamily: "monospace",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {fromAddress}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ color: C.textSecondary, fontSize: 12 }}>
                   {mode === "pathA" ? "Spending Card" : "Checking Account"}
                 </div>
-                <div
-                  style={{ color: C.textSecondary, fontSize: 12, marginTop: 1 }}
-                >
-                  ${nativeBalance} available
-                </div>
+              )}
+              <div
+                style={{ color: C.textSecondary, fontSize: 12, marginTop: 6 }}
+              >
+                ${nativeBalance} available
               </div>
             </div>
 
@@ -1000,7 +1055,8 @@ function TransferModal({
                   paddingRight: 120,
                 }}
               />
-              <span
+              <button
+                onClick={() => setShowScanner(true)}
                 style={{
                   position: "absolute",
                   right: 14,
@@ -1009,14 +1065,16 @@ function TransferModal({
                   fontSize: 12,
                   color: C.accent,
                   fontWeight: 600,
-                  cursor: "not-allowed",
-                  userSelect: "none",
+                  cursor: "pointer",
                   letterSpacing: 0.2,
                   whiteSpace: "nowrap",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
                 }}
               >
                 Scan QR code
-              </span>
+              </button>
             </div>
 
             {/* Amount */}
@@ -1055,7 +1113,7 @@ function TransferModal({
             </div>
 
             {/* Info notice */}
-            <div
+            {/* <div
               style={{
                 display: "flex",
                 alignItems: "flex-start",
@@ -1092,7 +1150,7 @@ function TransferModal({
                   </>
                 )}
               </span>
-            </div>
+            </div> */}
 
             {err && (
               <div
@@ -1410,6 +1468,16 @@ function TransferModal({
           </>
         )}
       </div>
+      {showScanner && (
+        <QRScannerModal
+          onClose={() => setShowScanner(false)}
+          onScan={(address, amount) => {
+            setRecipient(address);
+            if (amount) setAmount(amount);
+            setShowScanner(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1649,7 +1717,7 @@ function DepositModal({
   const senderAddress =
     walletSource === "browser" && browserAddr
       ? browserAddr
-      : privyWallet?.address ?? null;
+      : (privyWallet?.address ?? null);
   const targetAcctNum = mode === "self" ? accountNumber : otherAcctNum;
 
   async function connectBrowserWallet() {
@@ -1704,8 +1772,7 @@ function DepositModal({
         }),
       });
       const prepData = await prepRes.json();
-      if (!prepRes.ok)
-        throw new Error(prepData.error || prepRes.statusText);
+      if (!prepRes.ok) throw new Error(prepData.error || prepRes.statusText);
 
       const { to: poolAddress, calldata, value, relayId } = prepData;
 
@@ -1717,14 +1784,10 @@ function DepositModal({
       const allowData = encodeFunctionData({
         abi: ERC20_ABI,
         functionName: "allowance",
-        args: [
-          senderAddress as `0x${string}`,
-          poolAddress as `0x${string}`,
-        ],
+        args: [senderAddress as `0x${string}`, poolAddress as `0x${string}`],
       });
       const allowHex = await rpcRead(NATIVE_TOKEN, allowData);
-      const currentAllowance =
-        allowHex === "0x0" ? 0n : BigInt(allowHex);
+      const currentAllowance = allowHex === "0x0" ? 0n : BigInt(allowHex);
 
       if (currentAllowance < amountBn) {
         const appData = encodeFunctionData({
@@ -1734,9 +1797,7 @@ function DepositModal({
         });
         const appHash = (await provider.request({
           method: "eth_sendTransaction",
-          params: [
-            { from: senderAddress, to: NATIVE_TOKEN, data: appData },
-          ],
+          params: [{ from: senderAddress, to: NATIVE_TOKEN, data: appData }],
         })) as string;
 
         // Wait for approval to confirm
@@ -1784,8 +1845,7 @@ function DepositModal({
         body: JSON.stringify({ relayId }),
       });
       const confData = await confRes.json();
-      if (!confRes.ok)
-        throw new Error(confData.error || confRes.statusText);
+      if (!confRes.ok) throw new Error(confData.error || confRes.statusText);
 
       // Refresh balance
       qc.invalidateQueries({ queryKey: ["balances", depositorAddress] });
@@ -1904,8 +1964,7 @@ function DepositModal({
                 lineHeight: 1.5,
               }}
             >
-              Deposit{" "}
-              <strong style={{ color: C.textPrimary }}>USDC</strong> on{" "}
+              Deposit <strong style={{ color: C.textPrimary }}>USDC</strong> on{" "}
               <strong style={{ color: C.textPrimary }}>Monad Testnet</strong>{" "}
               directly from your connected wallet.
             </div>
@@ -2408,9 +2467,7 @@ function DepositModal({
               <span style={{ color: C.accent, fontSize: 13, marginTop: 1 }}>
                 ⓘ
               </span>
-              <span
-                style={{ color: C.accent, fontSize: 12, lineHeight: 1.5 }}
-              >
+              <span style={{ color: C.accent, fontSize: 12, lineHeight: 1.5 }}>
                 {mode === "self"
                   ? "USDC will be deposited from your connected wallet and credited to your account balance."
                   : "USDC will be deposited from your connected wallet and credited to the recipient's account."}
@@ -2658,7 +2715,11 @@ function DepositModal({
                           fontWeight: failed ? 600 : 400,
                         }}
                       >
-                        {done ? STEPS_DONE[i] : failed ? `Failed: ${label.replace("...", "")}` : label.replace("...", "")}
+                        {done
+                          ? STEPS_DONE[i]
+                          : failed
+                            ? `Failed: ${label.replace("...", "")}`
+                            : label.replace("...", "")}
                       </div>
                     </div>
                     {i < STEPS.length - 1 && (
@@ -2907,7 +2968,7 @@ function AddCardModal({
             display: "block",
           }}
         >
-          Wallet / EOA Address
+          Wallet Address
         </label>
         <div style={{ position: "relative", marginBottom: 20 }}>
           <input
@@ -3172,7 +3233,7 @@ function CardModal({
               marginBottom: 4,
             }}
           >
-            EOA Address
+            Address
           </div>
           <div
             style={{
@@ -3335,7 +3396,9 @@ export default function AnoBankMobileApp() {
       ?.address ?? null;
 
   // Tracks which button triggered login — "signup" creates a Safe, "payment" skips it
-  const [loginIntent, setLoginIntent] = useState<"signup" | "payment" | null>(null);
+  const [loginIntent, setLoginIntent] = useState<"signup" | "payment" | null>(
+    null,
+  );
 
   // Auto-create embedded wallet for email/social logins that don't have one yet
   const [creatingWallet, setCreatingWallet] = useState(false);
@@ -3588,7 +3651,10 @@ export default function AnoBankMobileApp() {
         </div>
         <div style={{ width: "100%", maxWidth: 340 }}>
           <button
-            onClick={() => { setLoginIntent("signup"); login(); }}
+            onClick={() => {
+              setLoginIntent("signup");
+              login();
+            }}
             style={{
               width: "100%",
               padding: "18px",
@@ -3605,7 +3671,10 @@ export default function AnoBankMobileApp() {
             Sign Up
           </button>
           <button
-            onClick={() => { setLoginIntent("payment"); login(); }}
+            onClick={() => {
+              setLoginIntent("payment");
+              login();
+            }}
             style={{
               width: "100%",
               padding: "18px",
@@ -4438,7 +4507,8 @@ export default function AnoBankMobileApp() {
                       maxWidth: "70%",
                     }}
                   >
-                    Interact directly with DeFi protocols from your AnoBank account
+                    Interact directly with DeFi protocols from your AnoBank
+                    account
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
                     {[
@@ -5208,7 +5278,7 @@ export default function AnoBankMobileApp() {
                     No SpendAuthorized events yet.
                     {!spendInteractorAddress && (
                       <div style={{ marginTop: 8, fontSize: 12 }}>
-                        Register an EOA to start tracking on-chain
+                        Register an address to start tracking on-chain
                         authorizations.
                       </div>
                     )}
@@ -5790,6 +5860,7 @@ export default function AnoBankMobileApp() {
               getAccessToken={getAccessToken}
               initialRecipient={qrPreset?.address ?? ""}
               initialAmount={qrPreset?.amount ?? ""}
+              cards={cards}
             />
           )}
           {showQrScanner && (
