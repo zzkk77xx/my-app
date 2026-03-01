@@ -744,8 +744,11 @@ function TransferModal({
             setWithdrawalStatus(match.withdrawalStatus);
             if (
               match.withdrawalStatus === "done" ||
-              match.withdrawalStatus === "failed"
+              match.withdrawalStatus === "failed" ||
+              match.withdrawalStatus === "dead_letter"
             ) {
+              if (match.withdrawalStatus === "dead_letter")
+                setWithdrawalStatus("failed");
               clearInterval(interval);
             }
           }
@@ -4984,7 +4987,8 @@ export default function AnoBankMobileApp() {
                       {
                         emoji: "🧾",
                         label: "Expenses",
-                        value: expenses > 0 ? `-$${expenses.toFixed(2)}` : "$0.00",
+                        value:
+                          expenses > 0 ? `-$${expenses.toFixed(2)}` : "$0.00",
                         color: expenses > 0 ? C.red : C.textTertiary,
                         bar: C.red,
                         pct: Math.round((expenses / maxVal) * 100),
@@ -5399,7 +5403,8 @@ export default function AnoBankMobileApp() {
                                 onChange={(e) =>
                                   setCardNames((prev) => ({
                                     ...prev,
-                                    [card.address.toLowerCase()]: e.target.value,
+                                    [card.address.toLowerCase()]:
+                                      e.target.value,
                                   }))
                                 }
                                 onBlur={() => setEditingCardAddr(null)}
