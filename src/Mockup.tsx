@@ -2364,7 +2364,7 @@ function CardModal({
 }
 
 // ===================== MAIN APP =====================
-export default function S4bMobileApp() {
+export default function AnoBankMobileApp() {
   // ── Privy
   const {
     ready: privyReady,
@@ -2626,10 +2626,10 @@ export default function S4bMobileApp() {
             letterSpacing: -1,
           }}
         >
-          S4b
+          AnoBank
         </div>
         <div style={{ color: C.textSecondary, fontSize: 15, marginBottom: 48 }}>
-          Crypto Banking
+          Private Banking
         </div>
         <div style={{ width: "100%", maxWidth: 340 }}>
           <button
@@ -2657,7 +2657,7 @@ export default function S4bMobileApp() {
               lineHeight: 1.6,
             }}
           >
-            Connect your wallet to access your S4b account.
+            Connect your wallet to access your AnoBank account.
             <br />
             Your keys, your funds. Powered by Privy.
           </div>
@@ -3025,7 +3025,7 @@ export default function S4bMobileApp() {
                       4.6% APY
                     </span>
                     <span style={{ color: C.textTertiary, fontSize: 12 }}>
-                      S4b Pool · native yield
+                      AnoBank Pool · native yield
                     </span>
                   </div>
                 </div>
@@ -3316,7 +3316,7 @@ export default function S4bMobileApp() {
                                 letterSpacing: 0.5,
                               }}
                             >
-                              S4B USER
+                              ANOBANK USER
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
@@ -3466,7 +3466,7 @@ export default function S4bMobileApp() {
                       maxWidth: "70%",
                     }}
                   >
-                    Interact directly with DeFi protocols from your S4b account
+                    Interact directly with DeFi protocols from your AnoBank account
                   </div>
                   <div style={{ display: "flex", gap: 12 }}>
                     {[
@@ -3823,7 +3823,7 @@ export default function S4bMobileApp() {
                     }}
                   >
                     <div style={{ color: C.textTertiary, fontSize: 12 }}>
-                      Your balance is held in the shared S4b spending pool —
+                      Your balance is held in the shared AnoBank spending pool —
                       earning native yield on every $.
                     </div>
                   </div>
@@ -4059,7 +4059,7 @@ export default function S4bMobileApp() {
                                 letterSpacing: 0.5,
                               }}
                             >
-                              S4B USER
+                              ANOBANK USER
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
@@ -4392,7 +4392,7 @@ export default function S4bMobileApp() {
                     marginBottom: 24,
                   }}
                 >
-                  Access DeFi protocols directly from your S4b account
+                  Access DeFi protocols directly from your AnoBank account
                 </div>
 
                 {[
