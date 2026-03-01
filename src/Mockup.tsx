@@ -688,9 +688,9 @@ function TransferModal({
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
-  const [stage, setStage] = useState<"input" | "tracking" | "rejected">(
-    "input",
-  );
+  const [stage, setStage] = useState<
+    "input" | "confirm" | "tracking" | "rejected"
+  >("input");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [pathBResult, setPathBResult] = useState<{
     approved: boolean;
@@ -1164,7 +1164,9 @@ function TransferModal({
             )}
 
             <button
-              onClick={mode === "pathA" ? handlePathA : handlePathB}
+              onClick={
+                mode === "pathA" ? handlePathA : () => setStage("confirm")
+              }
               disabled={sending || !amount || !recipient}
               style={{
                 width: "100%",
@@ -1190,6 +1192,150 @@ function TransferModal({
                   ? "Authorize Payment"
                   : "Submit Transfer"}
             </button>
+          </>
+        )}
+
+        {/* ===== CONFIRM STAGE (Path B only) ===== */}
+        {stage === "confirm" && (
+          <>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  background: C.accentSoft,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px",
+                  fontSize: 24,
+                }}
+              >
+                <Icon.Send />
+              </div>
+              <div
+                style={{
+                  color: C.textPrimary,
+                  fontSize: 18,
+                  fontWeight: 600,
+                  marginBottom: 4,
+                }}
+              >
+                Confirm Transfer
+              </div>
+              <div style={{ color: C.textSecondary, fontSize: 13 }}>
+                Please review the details below
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: C.bg,
+                borderRadius: 14,
+                padding: "16px",
+                marginBottom: 20,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <span style={{ color: C.textSecondary, fontSize: 13 }}>
+                  Amount
+                </span>
+                <span
+                  style={{
+                    color: C.textPrimary,
+                    fontSize: 15,
+                    fontWeight: 600,
+                  }}
+                >
+                  ${amount}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span style={{ color: C.textSecondary, fontSize: 13 }}>
+                  Recipient
+                </span>
+                <span
+                  style={{
+                    color: C.textPrimary,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {recipient.slice(0, 8)}...{recipient.slice(-6)}
+                </span>
+              </div>
+            </div>
+
+            {err && (
+              <div
+                style={{
+                  background: C.redSoft,
+                  border: `1px solid rgba(229,51,74,0.2)`,
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  marginBottom: 16,
+                  color: C.red,
+                  fontSize: 13,
+                }}
+              >
+                {err}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setStage("input");
+                  setErr("");
+                }}
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  padding: "14px",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  color: C.textSecondary,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Back
+              </button>
+              <button
+                onClick={handlePathB}
+                disabled={sending}
+                style={{
+                  flex: 2,
+                  padding: "14px",
+                  background: C.accent,
+                  border: "none",
+                  borderRadius: 14,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: sending ? 0.5 : 1,
+                }}
+              >
+                {sending ? "Processing..." : "Confirm & Send"}
+              </button>
+            </div>
           </>
         )}
 
