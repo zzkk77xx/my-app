@@ -7,7 +7,7 @@ import {
   getEmbeddedConnectedWallet,
 } from "@privy-io/react-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, keccak256, encodePacked } from "viem";
 import QRCode from "qrcode";
 
 const NATIVE_TOKEN = "0x7Dcd90Fe59D992CAA57dB69041B6cEEc9Db6E2af";
@@ -45,6 +45,19 @@ async function switchToMonad(provider: {
   }
 }
 
+const AUTHORIZE_SPEND_ABI = [
+  {
+    type: "function",
+    name: "authorizeSpend",
+    inputs: [
+      { name: "amount", type: "uint256" },
+      { name: "recipientHash", type: "bytes32" },
+      { name: "transferType", type: "uint8" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
 
 const SPEND_INTERACTOR_READ_ABI = [
   {
@@ -659,17 +672,15 @@ function TransferModal({
   spendInteractorAddress,
   userAddress,
   getAccessToken,
+  cards = [],
   initialRecipient = "",
   initialAmount = "",
-  cards = [],
 }: {
   onClose: () => void;
   nativeBalance: string;
   spendInteractorAddress: string | null;
   userAddress: string;
   getAccessToken: () => Promise<string | null>;
-  initialRecipient?: string;
-  initialAmount?: string;
   cards?: {
     id: number;
     name: string;
@@ -677,12 +688,20 @@ function TransferModal({
     color: string;
     address: string;
     isMain: boolean;
+    dailyLimit: string;
+    remaining: string;
   }[];
+  initialRecipient?: string;
+  initialAmount?: string;
 }) {
+  // For Path A, only show backend-generated cards (not the main account)
+  // These are the EOAs whose private keys are stored server-side
+  const spendingCards = cards.filter((c) => !c.isMain && c.dailyLimit !== "0");
+  const [selectedCardIdx, setSelectedCardIdx] = useState(0);
+  const selectedCard =
+    spendingCards[selectedCardIdx] ?? spendingCards[0] ?? null;
 
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
-  const [fromCardIdx, setFromCardIdx] = useState(0);
-  const fromAddress = cards[fromCardIdx]?.address ?? userAddress;
   const [amount, setAmount] = useState(initialAmount);
   const [recipient, setRecipient] = useState(initialRecipient);
   const [stage, setStage] = useState<"input" | "tracking" | "rejected">(
@@ -732,8 +751,8 @@ function TransferModal({
 
   async function handlePathA() {
     if (!amount || !recipient || sending) return;
-    if (!spendInteractorAddress) {
-      setErr("Account setup not yet complete.");
+    if (!selectedCard) {
+      setErr("No spending card available. Add a card first.");
       return;
     }
     setSending(true);
@@ -747,7 +766,7 @@ function TransferModal({
 
       const token = await getAccessToken();
       const res = await fetch(
-        `${API_URL}/users/${userAddress}/cards/${fromAddress}/spend`,
+        `${API_URL}/users/${userAddress}/cards/${selectedCard.address}/spend`,
         {
           method: "POST",
           headers: {
@@ -755,9 +774,9 @@ function TransferModal({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            amount: parseWei(amount),
+            amount: parseWei(amount, 18),
             recipient,
-            transferType: 1,
+            transferType: 0,
           }),
         },
       );
@@ -796,7 +815,8 @@ function TransferModal({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          amount: parseWei(amount),
+          userAddress,
+          amount: parseWei(amount, 18),
           recipient,
           transferType: 0,
         }),
@@ -942,72 +962,107 @@ function TransferModal({
             </div>
 
             {/* From account */}
-            <div
-              style={{
-                background: C.accentSoft,
-                borderRadius: 14,
-                padding: "12px 16px",
-                marginBottom: 16,
-              }}
-            >
+            {mode === "pathA" && spendingCards.length > 0 ? (
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    color: C.textSecondary,
+                    fontSize: 12,
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                  }}
+                >
+                  Pay from
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {spendingCards.map((card, i) => (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedCardIdx(i)}
+                      style={{
+                        flex: spendingCards.length <= 3 ? 1 : undefined,
+                        padding: "10px 14px",
+                        background: selectedCardIdx === i ? C.accentSoft : C.bg,
+                        border: `1.5px solid ${selectedCardIdx === i ? C.accent : C.border}`,
+                        borderRadius: 12,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginBottom: 2,
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>{card.emoji}</span>
+                        <span
+                          style={{
+                            color:
+                              selectedCardIdx === i
+                                ? C.textPrimary
+                                : C.textSecondary,
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {card.name}
+                        </span>
+                      </div>
+                      <div style={{ color: C.textTertiary, fontSize: 10 }}>
+                        ${fmtWei(card.remaining, 18)} left today
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : mode === "pathA" ? (
               <div
                 style={{
-                  color: C.accent,
+                  background: "rgba(229,51,74,0.08)",
+                  borderRadius: 14,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  color: C.red,
                   fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 8,
                 }}
               >
-                From
+                No registered cards. Register an EOA first.
               </div>
-              {cards.length > 0 ? (
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
-                  <select
-                    value={fromCardIdx}
-                    onChange={(e) => setFromCardIdx(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      background: C.bg,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 10,
-                      color: C.textPrimary,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      padding: "8px 10px",
-                      cursor: "pointer",
-                      outline: "none",
-                    }}
+            ) : (
+              <div
+                style={{
+                  background: C.accentSoft,
+                  borderRadius: 14,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div
+                    style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}
                   >
-                    {cards.map((c, i) => (
-                      <option key={c.address} value={i}>
-                        {c.emoji} {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    From: Checking Account
+                  </div>
                   <div
                     style={{
-                      color: C.textTertiary,
-                      fontSize: 11,
-                      fontFamily: "monospace",
-                      wordBreak: "break-all",
+                      color: C.textSecondary,
+                      fontSize: 12,
+                      marginTop: 1,
                     }}
                   >
-                    {fromAddress}
+                    ${nativeBalance} available
                   </div>
                 </div>
-              ) : (
-                <div style={{ color: C.textSecondary, fontSize: 12 }}>
-                  {mode === "pathA" ? "Spending Card" : "Checking Account"}
-                </div>
-              )}
-              <div
-                style={{ color: C.textSecondary, fontSize: 12, marginTop: 6 }}
-              >
-                ${nativeBalance} available
               </div>
-            </div>
+            )}
 
             {/* Recipient */}
             <label
@@ -2867,7 +2922,7 @@ function AddCardModal({
   const [limit, setLimit] = useState(1000);
 
   function handleSubmit() {
-    onAdd(parseWei(limit.toString()));
+    onAdd(parseWei(limit.toString(), 18));
   }
 
   const displayErr = error;
@@ -3250,7 +3305,9 @@ function CardModal({
 
         <div style={{ display: "flex", gap: 10 }}>
           <button
-            onClick={() => onRegister(card.address, parseWei(limit.toString()))}
+            onClick={() =>
+              onRegister(card.address, parseWei(limit.toString(), 18))
+            }
             disabled={registering}
             style={{
               flex: 1,
@@ -3305,7 +3362,6 @@ export default function AnoBankMobileApp() {
   // Use the embedded (Privy-managed) wallet as account identity
   const embeddedWallet = getEmbeddedConnectedWallet(wallets);
   const userAddress: string | null = embeddedWallet?.address ?? null;
-
 
   // Tracks which button triggered login — "signup" creates a Safe, "payment" skips it
   const [loginIntent, setLoginIntent] = useState<"signup" | "payment" | null>(
@@ -3458,19 +3514,32 @@ export default function AnoBankMobileApp() {
   });
 
   const registerEoaMutation = useMutation({
-    mutationFn: async ({ dailyLimit }: { dailyLimit: string }) => {
+    mutationFn: async ({
+      eoa,
+      dailyLimit,
+    }: {
+      eoa?: string;
+      dailyLimit: string;
+    }) => {
       const token = await getAccessToken();
-      const res = await fetch(`${API_URL}/users/${userAddress}/cards`, {
+      // If eoa is provided, register specific EOA via /eoas; otherwise create new card via /cards
+      const url = eoa
+        ? `${API_URL}/users/${userAddress}/eoas`
+        : `${API_URL}/users/${userAddress}/cards`;
+      const body = eoa
+        ? { eoa, dailyLimit, allowedTypes: [0, 1] }
+        : { dailyLimit, allowedTypes: [0, 1] };
+      const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ dailyLimit, allowedTypes: [0, 1] }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(body?.error ?? res.statusText);
+        const data = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(data?.error ?? res.statusText);
       }
       return res.json();
     },
@@ -5791,8 +5860,8 @@ export default function AnoBankMobileApp() {
               card={selectedCard}
               isActive={selectedCard.isMain}
               onClose={() => setSelectedCardIdx(null)}
-              onRegister={(_eoa, dailyLimit) =>
-                registerEoaMutation.mutate({ dailyLimit })
+              onRegister={(eoa, dailyLimit) =>
+                registerEoaMutation.mutate({ eoa, dailyLimit })
               }
               registering={registerEoaMutation.isPending}
             />
@@ -5803,9 +5872,7 @@ export default function AnoBankMobileApp() {
                 setShowAddCard(false);
                 registerEoaMutation.reset();
               }}
-              onAdd={(dailyLimit) =>
-                registerEoaMutation.mutate({ dailyLimit })
-              }
+              onAdd={(dailyLimit) => registerEoaMutation.mutate({ dailyLimit })}
               registering={registerEoaMutation.isPending}
               error={dataError}
             />
