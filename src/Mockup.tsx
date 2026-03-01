@@ -807,7 +807,8 @@ function TransferModal({
         }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || res.statusText);
+      if (!res.ok)
+        throw new Error(result.reason || result.error || res.statusText);
 
       setPathBResult(result);
       if (result.status === "approved") {
@@ -946,79 +947,81 @@ function TransferModal({
               ))}
             </div>
 
-            {/* From account */}
-            {spendingCards.length > 0 ? (
-              <div style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    color: C.textSecondary,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  Pay from
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {spendingCards.map((card, i) => (
-                    <button
-                      key={card.id}
-                      onClick={() => setSelectedCardIdx(i)}
-                      style={{
-                        flex: spendingCards.length <= 3 ? 1 : undefined,
-                        padding: "10px 14px",
-                        background: selectedCardIdx === i ? C.accentSoft : C.bg,
-                        border: `1.5px solid ${selectedCardIdx === i ? C.accent : C.border}`,
-                        borderRadius: 12,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      <div
+            {/* From account — only for Path A (card payments) */}
+            {mode === "pathA" &&
+              (spendingCards.length > 0 ? (
+                <div style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      color: C.textSecondary,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Pay from
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {spendingCards.map((card, i) => (
+                      <button
+                        key={card.id}
+                        onClick={() => setSelectedCardIdx(i)}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          marginBottom: 2,
+                          flex: spendingCards.length <= 3 ? 1 : undefined,
+                          padding: "10px 14px",
+                          background:
+                            selectedCardIdx === i ? C.accentSoft : C.bg,
+                          border: `1.5px solid ${selectedCardIdx === i ? C.accent : C.border}`,
+                          borderRadius: 12,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.15s",
                         }}
                       >
-                        <span style={{ fontSize: 14 }}>{card.emoji}</span>
-                        <span
+                        <div
                           style={{
-                            color:
-                              selectedCardIdx === i
-                                ? C.textPrimary
-                                : C.textSecondary,
-                            fontSize: 12,
-                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            marginBottom: 2,
                           }}
                         >
-                          {card.name}
-                        </span>
-                      </div>
-                      <div style={{ color: C.textTertiary, fontSize: 10 }}>
-                        ${fmtWei(card.remaining, 18)} left today
-                      </div>
-                    </button>
-                  ))}
+                          <span style={{ fontSize: 14 }}>{card.emoji}</span>
+                          <span
+                            style={{
+                              color:
+                                selectedCardIdx === i
+                                  ? C.textPrimary
+                                  : C.textSecondary,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {card.name}
+                          </span>
+                        </div>
+                        <div style={{ color: C.textTertiary, fontSize: 10 }}>
+                          ${fmtWei(card.remaining, 18)} left today
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  background: "rgba(229,51,74,0.08)",
-                  borderRadius: 14,
-                  padding: "12px 16px",
-                  marginBottom: 16,
-                  color: C.red,
-                  fontSize: 13,
-                }}
-              >
-                No spending card yet. Go to Cards to add one.
-              </div>
-            )}
+              ) : (
+                <div
+                  style={{
+                    background: "rgba(229,51,74,0.08)",
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginBottom: 16,
+                    color: C.red,
+                    fontSize: 13,
+                  }}
+                >
+                  No spending card yet. Go to Cards to add one.
+                </div>
+              ))}
 
             {/* Recipient */}
             <label
