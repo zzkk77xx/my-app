@@ -7,7 +7,7 @@ import {
   getEmbeddedConnectedWallet,
 } from "@privy-io/react-auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { encodeFunctionData, keccak256, encodePacked } from "viem";
+import { encodeFunctionData } from "viem";
 import QRCode from "qrcode";
 
 const NATIVE_TOKEN = "0x7Dcd90Fe59D992CAA57dB69041B6cEEc9Db6E2af";
@@ -45,19 +45,6 @@ async function switchToMonad(provider: {
   }
 }
 
-const AUTHORIZE_SPEND_ABI = [
-  {
-    type: "function",
-    name: "authorizeSpend",
-    inputs: [
-      { name: "amount", type: "uint256" },
-      { name: "recipientHash", type: "bytes32" },
-      { name: "transferType", type: "uint8" },
-    ],
-    outputs: [],
-    stateMutability: "nonpayable",
-  },
-] as const;
 
 const SPEND_INTERACTOR_READ_ABI = [
   {
@@ -668,7 +655,6 @@ function QRScannerModal({
 // --- Transfer Modal ---
 function TransferModal({
   onClose,
-  nativeBalance,
   spendInteractorAddress,
   userAddress,
   getAccessToken,
@@ -677,7 +663,6 @@ function TransferModal({
   initialAmount = "",
 }: {
   onClose: () => void;
-  nativeBalance: string;
   spendInteractorAddress: string | null;
   userAddress: string;
   getAccessToken: () => Promise<string | null>;
@@ -694,12 +679,11 @@ function TransferModal({
   initialRecipient?: string;
   initialAmount?: string;
 }) {
-  // For Path A, only show backend-generated cards (not the main account)
-  // These are the EOAs whose private keys are stored server-side
-  const spendingCards = cards.filter((c) => !c.isMain && c.dailyLimit !== "0");
+  // Only show backend-generated spending cards (main account has no stored key)
+  const spendingCards = cards.filter((c) => !c.isMain);
+
   const [selectedCardIdx, setSelectedCardIdx] = useState(0);
-  const selectedCard =
-    spendingCards[selectedCardIdx] ?? spendingCards[0] ?? null;
+  const selectedCard = spendingCards[selectedCardIdx] ?? spendingCards[0] ?? null;
 
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
   const [amount, setAmount] = useState(initialAmount);
@@ -962,7 +946,7 @@ function TransferModal({
             </div>
 
             {/* From account */}
-            {mode === "pathA" && spendingCards.length > 0 ? (
+            {spendingCards.length > 0 ? (
               <div style={{ marginBottom: 16 }}>
                 <div
                   style={{
@@ -1020,7 +1004,7 @@ function TransferModal({
                   ))}
                 </div>
               </div>
-            ) : mode === "pathA" ? (
+            ) : (
               <div
                 style={{
                   background: "rgba(229,51,74,0.08)",
@@ -1031,36 +1015,7 @@ function TransferModal({
                   fontSize: 13,
                 }}
               >
-                No registered cards. Register an EOA first.
-              </div>
-            ) : (
-              <div
-                style={{
-                  background: C.accentSoft,
-                  borderRadius: 14,
-                  padding: "12px 16px",
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <div
-                    style={{ color: C.accent, fontSize: 13, fontWeight: 600 }}
-                  >
-                    From: Checking Account
-                  </div>
-                  <div
-                    style={{
-                      color: C.textSecondary,
-                      fontSize: 12,
-                      marginTop: 1,
-                    }}
-                  >
-                    ${nativeBalance} available
-                  </div>
-                </div>
+                No spending card yet. Go to Cards to add one.
               </div>
             )}
 
@@ -4152,11 +4107,11 @@ export default function AnoBankMobileApp() {
                     scrollbarWidth: "none",
                   }}
                 >
-                  {cards.map((card) => {
+                  {cards.filter((c) => !c.isMain).map((card) => {
                     const cardNum = cardNumberFromAddr(card.address);
                     const expiry = cardExpiryFromAddr(card.address);
                     const colorA = card.color;
-                    const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
+                    const colorB = `${card.color}99`;
                     const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
                     const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
                     const spent = Math.max(0, daily - rem);
@@ -4332,7 +4287,7 @@ export default function AnoBankMobileApp() {
                                 letterSpacing: 0.5,
                               }}
                             >
-                              ANOBANK USER
+                              {card.name.toUpperCase()}
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
@@ -4861,7 +4816,7 @@ export default function AnoBankMobileApp() {
                 >
                   My Cards
                 </div>
-                {cards.map((card) => {
+                {cards.filter((c) => !c.isMain).map((card) => {
                   const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
                   const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
                   const spent = Math.max(0, daily - rem);
@@ -5076,7 +5031,7 @@ export default function AnoBankMobileApp() {
                                 letterSpacing: 0.5,
                               }}
                             >
-                              ANOBANK USER
+                              {card.name.toUpperCase()}
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
@@ -5829,7 +5784,6 @@ export default function AnoBankMobileApp() {
                 setShowTransfer(false);
                 setQrPreset(null);
               }}
-              nativeBalance={nativeBalance}
               spendInteractorAddress={spendInteractorAddress}
               userAddress={userAddress}
               getAccessToken={getAccessToken}
