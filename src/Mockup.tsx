@@ -693,14 +693,15 @@ function TransferModal({
     color: string;
     address: string;
     isMain: boolean;
+    isBackendCard?: boolean;
     dailyLimit: string;
     remaining: string;
   }[];
   initialRecipient?: string;
   initialAmount?: string;
 }) {
-  // Only show backend-generated spending cards (main account has no stored key)
-  const spendingCards = cards.filter((c) => !c.isMain);
+  // Only show backend-managed cards (private key stored server-side)
+  const spendingCards = cards.filter((c) => c.isBackendCard);
 
   const [selectedCardIdx, setSelectedCardIdx] = useState(0);
   const selectedCard =
@@ -827,7 +828,8 @@ function TransferModal({
         }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || res.statusText);
+      if (!res.ok)
+        throw new Error(result.reason || result.error || res.statusText);
 
       setPathBResult(result);
       if (result.status === "approved") {
@@ -966,79 +968,81 @@ function TransferModal({
               ))}
             </div>
 
-            {/* From account */}
-            {spendingCards.length > 0 ? (
-              <div style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    color: C.textSecondary,
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    marginBottom: 6,
-                  }}
-                >
-                  Pay from
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {spendingCards.map((card, i) => (
-                    <button
-                      key={card.id}
-                      onClick={() => setSelectedCardIdx(i)}
-                      style={{
-                        flex: spendingCards.length <= 3 ? 1 : undefined,
-                        padding: "10px 14px",
-                        background: selectedCardIdx === i ? C.accentSoft : C.bg,
-                        border: `1.5px solid ${selectedCardIdx === i ? C.accent : C.border}`,
-                        borderRadius: 12,
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s",
-                      }}
-                    >
-                      <div
+            {/* From account — only for Path A (card payments) */}
+            {mode === "pathA" &&
+              (spendingCards.length > 0 ? (
+                <div style={{ marginBottom: 16 }}>
+                  <div
+                    style={{
+                      color: C.textSecondary,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Pay from
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {spendingCards.map((card, i) => (
+                      <button
+                        key={card.id}
+                        onClick={() => setSelectedCardIdx(i)}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          marginBottom: 2,
+                          flex: spendingCards.length <= 3 ? 1 : undefined,
+                          padding: "10px 14px",
+                          background:
+                            selectedCardIdx === i ? C.accentSoft : C.bg,
+                          border: `1.5px solid ${selectedCardIdx === i ? C.accent : C.border}`,
+                          borderRadius: 12,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.15s",
                         }}
                       >
-                        <span style={{ fontSize: 14 }}>{card.emoji}</span>
-                        <span
+                        <div
                           style={{
-                            color:
-                              selectedCardIdx === i
-                                ? C.textPrimary
-                                : C.textSecondary,
-                            fontSize: 12,
-                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            marginBottom: 2,
                           }}
                         >
-                          {card.name}
-                        </span>
-                      </div>
-                      <div style={{ color: C.textTertiary, fontSize: 10 }}>
-                        ${fmtWei(card.remaining, 18)} left today
-                      </div>
-                    </button>
-                  ))}
+                          <span style={{ fontSize: 14 }}>{card.emoji}</span>
+                          <span
+                            style={{
+                              color:
+                                selectedCardIdx === i
+                                  ? C.textPrimary
+                                  : C.textSecondary,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {card.name}
+                          </span>
+                        </div>
+                        <div style={{ color: C.textTertiary, fontSize: 10 }}>
+                          ${fmtWei(card.remaining, 18)} left today
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  background: "rgba(229,51,74,0.08)",
-                  borderRadius: 14,
-                  padding: "12px 16px",
-                  marginBottom: 16,
-                  color: C.red,
-                  fontSize: 13,
-                }}
-              >
-                No spending card yet. Go to Cards to add one.
-              </div>
-            )}
+              ) : (
+                <div
+                  style={{
+                    background: "rgba(229,51,74,0.08)",
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginBottom: 16,
+                    color: C.red,
+                    fontSize: 13,
+                  }}
+                >
+                  No spending card yet. Go to Cards to add one.
+                </div>
+              ))}
 
             {/* Recipient */}
             <label
@@ -3564,6 +3568,22 @@ export default function AnoBankMobileApp() {
 
   const spendInteractorAddress = eoasData?.spendInteractorAddress ?? null;
 
+  // Backend-managed cards (private keys stored server-side, usable for Path A)
+  const { data: backendCardsData } = useQuery({
+    queryKey: ["cards", userAddress],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/users/${userAddress}/cards`);
+      if (!res.ok) return { cards: [] };
+      return res.json() as Promise<{
+        cards: { address: string; dailyLimit: string }[];
+      }>;
+    },
+    enabled: authenticated && !!userAddress,
+  });
+  const backendCardAddresses = new Set(
+    (backendCardsData?.cards ?? []).map((c) => c.address.toLowerCase()),
+  );
+
   const { data: eventsData, isLoading: eventsLoading } = useQuery({
     queryKey: ["events", spendInteractorAddress],
     queryFn: async () => {
@@ -3667,6 +3687,7 @@ export default function AnoBankMobileApp() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["eoas", userAddress] });
+      qc.invalidateQueries({ queryKey: ["cards", userAddress] });
       setSelectedCardIdx(null);
       setShowAddCard(false);
     },
@@ -3918,6 +3939,7 @@ export default function AnoBankMobileApp() {
       color: i === 0 ? C.accent : meta.color,
       address: addr,
       isMain: i === 0,
+      isBackendCard: backendCardAddresses.has(addr.toLowerCase()),
       dailyLimit: limits.dailyLimit,
       remaining: limits.remaining,
     };
@@ -3926,7 +3948,7 @@ export default function AnoBankMobileApp() {
   // Events as transaction rows
   const txRows = events.map((ev: any) => ({
     name: "SpendAuthorized",
-    amount: ev.amount ? parseFloat(fmtWei(ev.amount)) : 0,
+    amount: ev.amount ? parseFloat(fmtWei(ev.amount, 18)) : 0,
     date: ev.blockNumber ? `Block ${ev.blockNumber}` : "",
     icon: "",
     recipient: ev.recipient ? shortenAddr(ev.recipient, 6) : "",
