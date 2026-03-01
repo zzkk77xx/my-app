@@ -2423,16 +2423,16 @@ export default function S4bMobileApp() {
   });
 
   const { data: balancesData, isLoading: balancesLoading } = useQuery({
-    queryKey: ["balances"],
+    queryKey: ["balances", userAddress],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/balances`);
+      const res = await fetch(`${API_URL}/balances?addr=${userAddress}`);
       if (!res.ok) {
         const b = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(b?.error ?? res.statusText);
       }
       return res.json() as Promise<Record<string, string>>;
     },
-    enabled: authenticated,
+    enabled: authenticated && !!userAddress,
     refetchInterval: 30_000,
   });
 
@@ -2740,7 +2740,7 @@ export default function S4bMobileApp() {
   }
 
   // ── Derived data
-  const nativeBalance = fmtWei(balances[NATIVE_TOKEN]);
+  const nativeBalance = fmtWei(balances["usd"]);
 
   // Cards: user address first, then EOAs
   const allCardAddresses = [
