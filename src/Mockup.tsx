@@ -5740,7 +5740,7 @@ export default function AnoBankMobileApp() {
                         textTransform: "uppercase",
                       }}
                     >
-                      Coming Soon
+                      Coming Soon - not in Monad Testnet
                     </div>
                     <div
                       style={{
