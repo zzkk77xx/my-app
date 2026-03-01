@@ -1313,7 +1313,7 @@ function TransferModal({
                   marginBottom: 6,
                 }}
               >
-                This transaction exceeds your spending limit.
+                Transfer Rejected
               </div>
               <div
                 style={{
@@ -3384,7 +3384,8 @@ export default function S4bMobileApp() {
                   })}
                   <div
                     onClick={() => {
-                      /* add card flow */
+                      registerEoaMutation.reset();
+                      setShowAddCard(true);
                     }}
                     style={{
                       minWidth: 80,
