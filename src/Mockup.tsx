@@ -45,7 +45,6 @@ async function switchToMonad(provider: {
   }
 }
 
-
 const SPEND_INTERACTOR_READ_ABI = [
   {
     type: "function",
@@ -683,7 +682,8 @@ function TransferModal({
   const spendingCards = cards.filter((c) => !c.isMain);
 
   const [selectedCardIdx, setSelectedCardIdx] = useState(0);
-  const selectedCard = spendingCards[selectedCardIdx] ?? spendingCards[0] ?? null;
+  const selectedCard =
+    spendingCards[selectedCardIdx] ?? spendingCards[0] ?? null;
 
   const [mode, setMode] = useState<"pathA" | "pathB">("pathA");
   const [amount, setAmount] = useState(initialAmount);
@@ -4107,252 +4107,267 @@ export default function AnoBankMobileApp() {
                     scrollbarWidth: "none",
                   }}
                 >
-                  {cards.filter((c) => !c.isMain).map((card) => {
-                    const cardNum = cardNumberFromAddr(card.address);
-                    const expiry = cardExpiryFromAddr(card.address);
-                    const colorA = card.color;
-                    const colorB = `${card.color}99`;
-                    const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
-                    const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
-                    const spent = Math.max(0, daily - rem);
-                    const pct =
-                      daily > 0 ? Math.min((spent / daily) * 100, 100) : 0;
-                    return (
-                      <div
-                        key={card.id}
-                        onClick={() => setSelectedCardIdx(card.id)}
-                        style={{
-                          minWidth: 230,
-                          borderRadius: 20,
-                          padding: "16px 18px 0",
-                          background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
-                          cursor: "pointer",
-                          flexShrink: 0,
-                          position: "relative",
-                          overflow: "hidden",
-                          boxShadow: `0 8px 24px ${colorA}55`,
-                          color: "#fff",
-                        }}
-                      >
-                        {/* Decorative circles */}
+                  {cards
+                    .filter((c) => !c.isMain)
+                    .map((card) => {
+                      const cardNum = cardNumberFromAddr(card.address);
+                      const expiry = cardExpiryFromAddr(card.address);
+                      const colorA = card.color;
+                      const colorB = `${card.color}99`;
+                      const daily =
+                        parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
+                      const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
+                      const spent = Math.max(0, daily - rem);
+                      const pct =
+                        daily > 0 ? Math.min((spent / daily) * 100, 100) : 0;
+                      return (
                         <div
+                          key={card.id}
+                          onClick={() => setSelectedCardIdx(card.id)}
                           style={{
-                            position: "absolute",
-                            top: -25,
-                            right: -25,
-                            width: 110,
-                            height: 110,
-                            borderRadius: "50%",
-                            background: "rgba(255,255,255,0.08)",
-                            pointerEvents: "none",
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            bottom: 20,
-                            right: 15,
-                            width: 90,
-                            height: 90,
-                            borderRadius: "50%",
-                            background: "rgba(255,255,255,0.05)",
-                            pointerEvents: "none",
-                          }}
-                        />
-
-                        {/* Top row: chip + scan */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            marginBottom: 14,
+                            minWidth: 230,
+                            borderRadius: 20,
+                            padding: "16px 18px 0",
+                            background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
+                            cursor: "pointer",
+                            flexShrink: 0,
+                            position: "relative",
+                            overflow: "hidden",
+                            boxShadow: `0 8px 24px ${colorA}55`,
+                            color: "#fff",
                           }}
                         >
+                          {/* Decorative circles */}
                           <div
                             style={{
-                              width: 30,
-                              height: 22,
-                              borderRadius: 4,
-                              background:
-                                "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
-                              border: "1px solid rgba(255,255,255,0.4)",
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr",
-                              gap: 2,
-                              padding: 4,
-                              boxSizing: "border-box",
+                              position: "absolute",
+                              top: -25,
+                              right: -25,
+                              width: 110,
+                              height: 110,
+                              borderRadius: "50%",
+                              background: "rgba(255,255,255,0.08)",
+                              pointerEvents: "none",
                             }}
-                          >
-                            {[0, 1, 2, 3].map((i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  background: "rgba(180,140,0,0.55)",
-                                  borderRadius: 1,
-                                }}
-                              />
-                            ))}
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowQrScanner(true);
-                            }}
+                          />
+                          <div
                             style={{
-                              background: "rgba(255,255,255,0.2)",
-                              border: "none",
-                              borderRadius: 8,
-                              padding: "4px 9px",
-                              color: "#fff",
-                              fontSize: 10,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                              letterSpacing: 0.2,
+                              position: "absolute",
+                              bottom: 20,
+                              right: 15,
+                              width: 90,
+                              height: 90,
+                              borderRadius: "50%",
+                              background: "rgba(255,255,255,0.05)",
+                              pointerEvents: "none",
                             }}
-                          >
-                            <svg
-                              width="10"
-                              height="10"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                            >
-                              <rect x="3" y="3" width="7" height="7" rx="1" />
-                              <rect x="14" y="3" width="7" height="7" rx="1" />
-                              <rect x="3" y="14" width="7" height="7" rx="1" />
-                              <rect
-                                x="14"
-                                y="14"
-                                width="3"
-                                height="3"
-                                rx="0.5"
-                              />
-                              <rect
-                                x="18"
-                                y="18"
-                                width="3"
-                                height="3"
-                                rx="0.5"
-                              />
-                            </svg>
-                            Scan QR
-                          </button>
-                        </div>
+                          />
 
-                        {/* Card number */}
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            letterSpacing: 2.5,
-                            marginBottom: 12,
-                            opacity: 0.92,
-                            fontFamily: "monospace",
-                          }}
-                        >
-                          {cardNum}
-                        </div>
-
-                        {/* Cardholder + expiry */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-end",
-                            marginBottom: 12,
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: 8,
-                                opacity: 0.65,
-                                marginBottom: 2,
-                                letterSpacing: 0.8,
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              Cardholder
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                letterSpacing: 0.5,
-                              }}
-                            >
-                              {card.name.toUpperCase()}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div
-                              style={{
-                                fontSize: 8,
-                                opacity: 0.65,
-                                marginBottom: 2,
-                                letterSpacing: 0.8,
-                              }}
-                            >
-                              EXPIRES
-                            </div>
-                            <div style={{ fontSize: 11, fontWeight: 700 }}>
-                              {expiry}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Spending limit bar */}
-                        <div style={{ marginLeft: -18, marginRight: -18 }}>
+                          {/* Top row: chip + scan */}
                           <div
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              paddingLeft: 18,
-                              paddingRight: 18,
-                              marginBottom: 5,
-                            }}
-                          >
-                            <span style={{ fontSize: 9, opacity: 0.7 }}>
-                              {daily > 0
-                                ? `${spent.toFixed(2)} spent`
-                                : "No limit set"}
-                            </span>
-                            {daily > 0 && (
-                              <span style={{ fontSize: 9, opacity: 0.7 }}>
-                                ${daily.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            style={{
-                              height: 3,
-                              background: "rgba(255,255,255,0.2)",
+                              alignItems: "center",
+                              marginBottom: 14,
                             }}
                           >
                             <div
                               style={{
-                                height: "100%",
-                                width: `${pct}%`,
+                                width: 30,
+                                height: 22,
+                                borderRadius: 4,
                                 background:
-                                  pct > 80
-                                    ? "#FF6B6B"
-                                    : "rgba(255,255,255,0.8)",
-                                transition: "width 0.6s ease",
+                                  "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
+                                border: "1px solid rgba(255,255,255,0.4)",
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 2,
+                                padding: 4,
+                                boxSizing: "border-box",
                               }}
-                            />
+                            >
+                              {[0, 1, 2, 3].map((i) => (
+                                <div
+                                  key={i}
+                                  style={{
+                                    background: "rgba(180,140,0,0.55)",
+                                    borderRadius: 1,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowQrScanner(true);
+                              }}
+                              style={{
+                                background: "rgba(255,255,255,0.2)",
+                                border: "none",
+                                borderRadius: 8,
+                                padding: "4px 9px",
+                                color: "#fff",
+                                fontSize: 10,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                letterSpacing: 0.2,
+                              }}
+                            >
+                              <svg
+                                width="10"
+                                height="10"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                              >
+                                <rect x="3" y="3" width="7" height="7" rx="1" />
+                                <rect
+                                  x="14"
+                                  y="3"
+                                  width="7"
+                                  height="7"
+                                  rx="1"
+                                />
+                                <rect
+                                  x="3"
+                                  y="14"
+                                  width="7"
+                                  height="7"
+                                  rx="1"
+                                />
+                                <rect
+                                  x="14"
+                                  y="14"
+                                  width="3"
+                                  height="3"
+                                  rx="0.5"
+                                />
+                                <rect
+                                  x="18"
+                                  y="18"
+                                  width="3"
+                                  height="3"
+                                  rx="0.5"
+                                />
+                              </svg>
+                              Scan QR
+                            </button>
                           </div>
+
+                          {/* Card number */}
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              letterSpacing: 2.5,
+                              marginBottom: 12,
+                              opacity: 0.92,
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {cardNum}
+                          </div>
+
+                          {/* Cardholder + expiry */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-end",
+                              marginBottom: 12,
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: 8,
+                                  opacity: 0.65,
+                                  marginBottom: 2,
+                                  letterSpacing: 0.8,
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                Cardholder
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                {card.name.toUpperCase()}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div
+                                style={{
+                                  fontSize: 8,
+                                  opacity: 0.65,
+                                  marginBottom: 2,
+                                  letterSpacing: 0.8,
+                                }}
+                              >
+                                EXPIRES
+                              </div>
+                              <div style={{ fontSize: 11, fontWeight: 700 }}>
+                                {expiry}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Spending limit bar */}
+                          <div style={{ marginLeft: -18, marginRight: -18 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                paddingLeft: 18,
+                                paddingRight: 18,
+                                marginBottom: 5,
+                              }}
+                            >
+                              <span style={{ fontSize: 9, opacity: 0.7 }}>
+                                {daily > 0
+                                  ? `${spent.toFixed(2)} spent`
+                                  : "No limit set"}
+                              </span>
+                              {daily > 0 && (
+                                <span style={{ fontSize: 9, opacity: 0.7 }}>
+                                  ${daily.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              style={{
+                                height: 3,
+                                background: "rgba(255,255,255,0.2)",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  width: `${pct}%`,
+                                  background:
+                                    pct > 80
+                                      ? "#FF6B6B"
+                                      : "rgba(255,255,255,0.8)",
+                                  transition: "width 0.6s ease",
+                                }}
+                              />
+                            </div>
+                          </div>
+                          {/* bottom padding */}
+                          <div style={{ height: 14 }} />
                         </div>
-                        {/* bottom padding */}
-                        <div style={{ height: 14 }} />
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                   <div
                     onClick={() => {
                       registerEoaMutation.reset();
@@ -4383,7 +4398,7 @@ export default function AnoBankMobileApp() {
                 </div>
 
                 {/* DeFi Section */}
-                <div
+                {/* <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -4493,30 +4508,8 @@ export default function AnoBankMobileApp() {
                         </span>
                       </div>
                     ))}
-                    {/* <div
-                      style={{
-                        flex: 1,
-                        background: C.bg,
-                        borderRadius: 14,
-                        padding: "16px",
-                        border: `1px dashed ${C.border}`,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
-                        opacity: 0.4,
-                      }}
-                    >
-                      <span style={{ color: C.textTertiary, fontSize: 22 }}>
-                        +
-                      </span>
-                      <span style={{ color: C.textTertiary, fontSize: 10 }}>
-                        More
-                      </span> 
-                    </div> */}
                   </div>
-                </div>
+                </div> */}
 
                 {/* Recent Activity */}
                 <div
@@ -4700,104 +4693,157 @@ export default function AnoBankMobileApp() {
                 {/* Monthly Summary */}
                 <div
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    color: C.textPrimary,
+                    fontSize: 20,
+                    fontWeight: 700,
                     marginBottom: 14,
                   }}
                 >
-                  <span
-                    style={{
-                      color: C.textPrimary,
-                      fontSize: 16,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {monthName} Summary
-                  </span>
+                  {monthName} Summary
                 </div>
                 <div
                   style={{
                     background: C.card,
-                    borderRadius: 18,
+                    borderRadius: 20,
                     padding: "20px",
                     border: `1px solid ${C.border}`,
                     marginBottom: 20,
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
+                  {/* Revenue row */}
+                  {[
+                    {
+                      emoji: "💰",
+                      label: "Revenue",
+                      value: "+€3420.00",
+                      color: C.accent,
+                      bar: "#6C5CE7",
+                      pct: 90,
+                    },
+                    {
+                      emoji: "🧾",
+                      label: "Expenses",
+                      value: "-€1247.33",
+                      color: C.red,
+                      bar: C.red,
+                      pct: 36,
+                    },
+                    {
+                      emoji: "📈",
+                      label: "Yield earned",
+                      value: "+€78.54",
+                      color: C.green,
+                      bar: C.green,
+                      pct: 2,
+                    },
+                  ].map((row, i, arr) => (
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                      key={row.label}
+                      style={{ marginBottom: i < arr.length - 1 ? 18 : 0 }}
                     >
-                      <span style={{ color: C.textSecondary, fontSize: 13 }}>
-                        Authorized spends
-                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span style={{ fontSize: 16 }}>{row.emoji}</span>
+                          <span
+                            style={{
+                              color: C.textSecondary,
+                              fontSize: 14,
+                            }}
+                          >
+                            {row.label}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            color: row.color,
+                            fontSize: 16,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {row.value}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          background: "rgba(255,255,255,0.06)",
+                          borderRadius: 4,
+                          height: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            borderRadius: 4,
+                            width: `${row.pct}%`,
+                            background: row.bar,
+                            transition: "width 0.8s ease",
+                          }}
+                        />
+                      </div>
                     </div>
-                    <span
-                      style={{ color: C.red, fontSize: 15, fontWeight: 700 }}
-                    >
-                      -${monthlySpent.toFixed(4)}
-                    </span>
-                  </div>
+                  ))}
+
+                  {/* Divider + Net */}
                   <div
                     style={{
-                      background: C.bg,
-                      borderRadius: 4,
-                      height: 6,
-                      overflow: "hidden",
-                      marginBottom: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        borderRadius: 4,
-                        width: `${Math.min((monthlySpent / Math.max(parseFloat(nativeBalance) || 1, 0.001)) * 100, 100)}%`,
-                        background: C.red,
-                        transition: "width 0.8s ease",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      paddingTop: 12,
                       borderTop: `1px solid ${C.border}`,
+                      marginTop: 18,
+                      paddingTop: 14,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      marginBottom: 14,
                     }}
                   >
-                    <span style={{ color: C.textSecondary, fontSize: 13 }}>
-                      Events this month
+                    <span style={{ color: C.textSecondary, fontSize: 14 }}>
+                      Net this month
                     </span>
                     <span
-                      style={{ color: C.accent, fontSize: 16, fontWeight: 700 }}
+                      style={{
+                        color: C.green,
+                        fontSize: 20,
+                        fontWeight: 700,
+                      }}
                     >
-                      {txRows.length}
+                      +€2251.21
                     </span>
                   </div>
+
+                  {/* Insight box */}
                   <div
                     style={{
-                      marginTop: 12,
-                      background: C.bg,
-                      borderRadius: 12,
-                      padding: "12px 14px",
+                      background: "rgba(0,168,107,0.10)",
+                      border: `1px solid rgba(0,168,107,0.20)`,
+                      borderRadius: 14,
+                      padding: "14px 16px",
                       display: "flex",
-                      alignItems: "center",
-                      gap: 8,
+                      gap: 10,
+                      alignItems: "flex-start",
                     }}
                   >
-                    <div style={{ color: C.textTertiary, fontSize: 12 }}>
-                      Your balance is held in the shared AnoBank spending pool —
-                      earning native yield on every $.
-                    </div>
+                    <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>
+                      💡
+                    </span>
+                    <span
+                      style={{ color: C.green, fontSize: 13, lineHeight: 1.55 }}
+                    >
+                      Your assets generated <strong>€78.54</strong> in yield
+                      this month at 3.82% APY — paid daily to your balance.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -4816,320 +4862,330 @@ export default function AnoBankMobileApp() {
                 >
                   My Cards
                 </div>
-                {cards.filter((c) => !c.isMain).map((card) => {
-                  const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
-                  const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
-                  const spent = Math.max(0, daily - rem);
-                  const pct = daily > 0 ? (spent / daily) * 100 : 0;
-                  const cardNum = cardNumberFromAddr(card.address);
-                  const expiry = cardExpiryFromAddr(card.address);
-                  const colorA = card.color;
-                  const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
-                  return (
-                    <div key={card.id} style={{ marginBottom: 16 }}>
-                      {/* Credit card visual */}
-                      <div
-                        onClick={() => setSelectedCardIdx(card.id)}
-                        style={{
-                          width: "100%",
-                          height: 180,
-                          borderRadius: 22,
-                          padding: "20px 22px",
-                          background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
-                          cursor: "pointer",
-                          position: "relative",
-                          overflow: "hidden",
-                          boxShadow: `0 10px 30px ${colorA}44`,
-                          color: "#fff",
-                          boxSizing: "border-box",
-                          marginBottom: 10,
-                        }}
-                      >
-                        {/* Decorative circles */}
+                {cards
+                  .filter((c) => !c.isMain)
+                  .map((card) => {
+                    const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
+                    const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
+                    const spent = Math.max(0, daily - rem);
+                    const pct = daily > 0 ? (spent / daily) * 100 : 0;
+                    const cardNum = cardNumberFromAddr(card.address);
+                    const expiry = cardExpiryFromAddr(card.address);
+                    const colorA = card.color;
+                    const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
+                    return (
+                      <div key={card.id} style={{ marginBottom: 16 }}>
+                        {/* Credit card visual */}
                         <div
+                          onClick={() => setSelectedCardIdx(card.id)}
                           style={{
-                            position: "absolute",
-                            top: -30,
-                            right: -30,
-                            width: 140,
-                            height: 140,
-                            borderRadius: "50%",
-                            background: "rgba(255,255,255,0.08)",
-                            pointerEvents: "none",
+                            width: "100%",
+                            height: 180,
+                            borderRadius: 22,
+                            padding: "20px 22px",
+                            background: `linear-gradient(135deg, ${colorA} 0%, ${colorB} 100%)`,
+                            cursor: "pointer",
+                            position: "relative",
+                            overflow: "hidden",
+                            boxShadow: `0 10px 30px ${colorA}44`,
+                            color: "#fff",
+                            boxSizing: "border-box",
+                            marginBottom: 10,
                           }}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            bottom: -40,
-                            right: 20,
-                            width: 110,
-                            height: 110,
-                            borderRadius: "50%",
-                            background: "rgba(255,255,255,0.05)",
-                            pointerEvents: "none",
-                          }}
-                        />
+                        >
+                          {/* Decorative circles */}
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: -30,
+                              right: -30,
+                              width: 140,
+                              height: 140,
+                              borderRadius: "50%",
+                              background: "rgba(255,255,255,0.08)",
+                              pointerEvents: "none",
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: "absolute",
+                              bottom: -40,
+                              right: 20,
+                              width: 110,
+                              height: 110,
+                              borderRadius: "50%",
+                              background: "rgba(255,255,255,0.05)",
+                              pointerEvents: "none",
+                            }}
+                          />
 
-                        {/* Top row: chip + badges */}
+                          {/* Top row: chip + badges */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: 20,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 34,
+                                height: 26,
+                                borderRadius: 5,
+                                background:
+                                  "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
+                                border: "1px solid rgba(255,255,255,0.4)",
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 2,
+                                padding: 4,
+                                boxSizing: "border-box",
+                              }}
+                            >
+                              {[0, 1, 2, 3].map((i) => (
+                                <div
+                                  key={i}
+                                  style={{
+                                    background: "rgba(180,140,0,0.55)",
+                                    borderRadius: 1,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              {card.isMain && (
+                                <div
+                                  style={{
+                                    background: "rgba(255,255,255,0.25)",
+                                    borderRadius: 6,
+                                    padding: "2px 8px",
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
+                                  MAIN
+                                </div>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowQrScanner(true);
+                                }}
+                                style={{
+                                  background: "rgba(255,255,255,0.2)",
+                                  border: "none",
+                                  borderRadius: 8,
+                                  padding: "4px 9px",
+                                  color: "#fff",
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  letterSpacing: 0.2,
+                                }}
+                              >
+                                <svg
+                                  width="10"
+                                  height="10"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                >
+                                  <rect
+                                    x="3"
+                                    y="3"
+                                    width="7"
+                                    height="7"
+                                    rx="1"
+                                  />
+                                  <rect
+                                    x="14"
+                                    y="3"
+                                    width="7"
+                                    height="7"
+                                    rx="1"
+                                  />
+                                  <rect
+                                    x="3"
+                                    y="14"
+                                    width="7"
+                                    height="7"
+                                    rx="1"
+                                  />
+                                  <rect
+                                    x="14"
+                                    y="14"
+                                    width="3"
+                                    height="3"
+                                    rx="0.5"
+                                  />
+                                  <rect
+                                    x="18"
+                                    y="18"
+                                    width="3"
+                                    height="3"
+                                    rx="0.5"
+                                  />
+                                </svg>
+                                Scan QR
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Card number */}
+                          <div
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 500,
+                              letterSpacing: 3,
+                              marginBottom: 16,
+                              opacity: 0.92,
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {cardNum}
+                          </div>
+
+                          {/* Bottom row */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-end",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  opacity: 0.65,
+                                  marginBottom: 3,
+                                  letterSpacing: 0.8,
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                Cardholder
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                {card.name.toUpperCase()}
+                              </div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  opacity: 0.65,
+                                  marginBottom: 3,
+                                  letterSpacing: 0.8,
+                                }}
+                              >
+                                EXPIRES
+                              </div>
+                              <div style={{ fontSize: 12, fontWeight: 700 }}>
+                                {expiry}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Below card: name, balance, limit bar */}
                         <div
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
-                            marginBottom: 20,
+                            marginBottom: 6,
+                            paddingLeft: 4,
+                            paddingRight: 4,
                           }}
                         >
                           <div
                             style={{
-                              width: 34,
-                              height: 26,
-                              borderRadius: 5,
-                              background:
-                                "linear-gradient(135deg, #D4AF37 0%, #FFF3A3 50%, #D4AF37 100%)",
-                              border: "1px solid rgba(255,255,255,0.4)",
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr",
-                              gap: 2,
-                              padding: 4,
-                              boxSizing: "border-box",
+                              color: C.textPrimary,
+                              fontSize: 14,
+                              fontWeight: 600,
                             }}
                           >
-                            {[0, 1, 2, 3].map((i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  background: "rgba(180,140,0,0.55)",
-                                  borderRadius: 1,
-                                }}
-                              />
-                            ))}
+                            {card.name}
                           </div>
+                          <div
+                            style={{
+                              color: C.textPrimary,
+                              fontSize: 14,
+                              fontWeight: 700,
+                            }}
+                          >
+                            {card.isMain ? `$${nativeBalance}` : "—"}
+                          </div>
+                        </div>
+                        <div style={{ paddingLeft: 4, paddingRight: 4 }}>
                           <div
                             style={{
                               display: "flex",
-                              alignItems: "center",
-                              gap: 6,
+                              justifyContent: "space-between",
+                              marginBottom: 4,
                             }}
                           >
-                            {card.isMain && (
-                              <div
-                                style={{
-                                  background: "rgba(255,255,255,0.25)",
-                                  borderRadius: 6,
-                                  padding: "2px 8px",
-                                  fontSize: 9,
-                                  fontWeight: 700,
-                                  letterSpacing: 0.5,
-                                }}
-                              >
-                                MAIN
-                              </div>
-                            )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowQrScanner(true);
-                              }}
-                              style={{
-                                background: "rgba(255,255,255,0.2)",
-                                border: "none",
-                                borderRadius: 8,
-                                padding: "4px 9px",
-                                color: "#fff",
-                                fontSize: 10,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
-                                letterSpacing: 0.2,
-                              }}
-                            >
-                              <svg
-                                width="10"
-                                height="10"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                              >
-                                <rect x="3" y="3" width="7" height="7" rx="1" />
-                                <rect
-                                  x="14"
-                                  y="3"
-                                  width="7"
-                                  height="7"
-                                  rx="1"
-                                />
-                                <rect
-                                  x="3"
-                                  y="14"
-                                  width="7"
-                                  height="7"
-                                  rx="1"
-                                />
-                                <rect
-                                  x="14"
-                                  y="14"
-                                  width="3"
-                                  height="3"
-                                  rx="0.5"
-                                />
-                                <rect
-                                  x="18"
-                                  y="18"
-                                  width="3"
-                                  height="3"
-                                  rx="0.5"
-                                />
-                              </svg>
-                              Scan QR
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Card number */}
-                        <div
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 500,
-                            letterSpacing: 3,
-                            marginBottom: 16,
-                            opacity: 0.92,
-                            fontFamily: "monospace",
-                          }}
-                        >
-                          {cardNum}
-                        </div>
-
-                        {/* Bottom row */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-end",
-                          }}
-                        >
-                          <div>
-                            <div
-                              style={{
-                                fontSize: 9,
-                                opacity: 0.65,
-                                marginBottom: 3,
-                                letterSpacing: 0.8,
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              Cardholder
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                letterSpacing: 0.5,
-                              }}
-                            >
-                              {card.name.toUpperCase()}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div
-                              style={{
-                                fontSize: 9,
-                                opacity: 0.65,
-                                marginBottom: 3,
-                                letterSpacing: 0.8,
-                              }}
-                            >
-                              EXPIRES
-                            </div>
-                            <div style={{ fontSize: 12, fontWeight: 700 }}>
-                              {expiry}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Below card: name, balance, limit bar */}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 6,
-                          paddingLeft: 4,
-                          paddingRight: 4,
-                        }}
-                      >
-                        <div
-                          style={{
-                            color: C.textPrimary,
-                            fontSize: 14,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {card.name}
-                        </div>
-                        <div
-                          style={{
-                            color: C.textPrimary,
-                            fontSize: 14,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {card.isMain ? `$${nativeBalance}` : "—"}
-                        </div>
-                      </div>
-                      <div style={{ paddingLeft: 4, paddingRight: 4 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            marginBottom: 4,
-                          }}
-                        >
-                          <span style={{ color: C.textTertiary, fontSize: 11 }}>
-                            {daily > 0
-                              ? `Spent ${spent.toFixed(4)} $`
-                              : "No daily limit set"}
-                          </span>
-                          {daily > 0 && (
                             <span
                               style={{ color: C.textTertiary, fontSize: 11 }}
                             >
-                              Limit {daily.toFixed(4)} $
+                              {daily > 0
+                                ? `Spent ${spent.toFixed(4)} $`
+                                : "No daily limit set"}
                             </span>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            background: C.border,
-                            borderRadius: 4,
-                            height: 4,
-                            overflow: "hidden",
-                          }}
-                        >
+                            {daily > 0 && (
+                              <span
+                                style={{ color: C.textTertiary, fontSize: 11 }}
+                              >
+                                Limit {daily.toFixed(4)} $
+                              </span>
+                            )}
+                          </div>
                           <div
                             style={{
-                              height: "100%",
+                              background: C.border,
                               borderRadius: 4,
-                              width: `${Math.min(pct, 100)}%`,
-                              background:
-                                pct > 80
-                                  ? C.red
-                                  : daily > 0
-                                    ? card.color
-                                    : C.border,
-                              transition: "width 0.6s ease",
+                              height: 4,
+                              overflow: "hidden",
                             }}
-                          />
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                borderRadius: 4,
+                                width: `${Math.min(pct, 100)}%`,
+                                background:
+                                  pct > 80
+                                    ? C.red
+                                    : daily > 0
+                                      ? card.color
+                                      : C.border,
+                                transition: "width 0.6s ease",
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 <button
                   onClick={() => {
                     registerEoaMutation.reset();
@@ -5837,17 +5893,6 @@ export default function AnoBankMobileApp() {
               defaultAddress={userAddress ?? ""}
             />
           )}
-        </div>
-
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 20,
-            color: C.textTertiary,
-            fontSize: 11,
-          }}
-        >
-          Tap on cards to manage limits · Use bottom nav to explore
         </div>
       </div>
     </div>
