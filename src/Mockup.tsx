@@ -2130,8 +2130,8 @@ function CardModal({
   registering: boolean;
 }) {
   const [limit, setLimit] = useState(1000);
-  const daily = parseFloat(fmtWei(card.dailyLimit)) || 0;
-  const rem = parseFloat(fmtWei(card.remaining)) || 0;
+  const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
+  const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
   const spent = Math.max(0, daily - rem);
   const pct = daily > 0 ? (spent / daily) * 100 : 0;
 
@@ -3141,8 +3141,8 @@ export default function S4bMobileApp() {
                     const expiry = cardExpiryFromAddr(card.address);
                     const colorA = card.color;
                     const colorB = card.isMain ? "#4A3ABF" : `${card.color}99`;
-                    const daily = parseFloat(fmtWei(card.dailyLimit)) || 0;
-                    const rem = parseFloat(fmtWei(card.remaining)) || 0;
+                    const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
+                    const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
                     const spent = Math.max(0, daily - rem);
                     const pct =
                       daily > 0 ? Math.min((spent / daily) * 100, 100) : 0;
@@ -3844,8 +3844,8 @@ export default function S4bMobileApp() {
                   My Cards
                 </div>
                 {cards.map((card) => {
-                  const daily = parseFloat(fmtWei(card.dailyLimit)) || 0;
-                  const rem = parseFloat(fmtWei(card.remaining)) || 0;
+                  const daily = parseFloat(fmtWei(card.dailyLimit, 18)) || 0;
+                  const rem = parseFloat(fmtWei(card.remaining, 18)) || 0;
                   const spent = Math.max(0, daily - rem);
                   const pct = daily > 0 ? (spent / daily) * 100 : 0;
                   const cardNum = cardNumberFromAddr(card.address);
