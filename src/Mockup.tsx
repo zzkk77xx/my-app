@@ -313,6 +313,27 @@ const Icon = {
       <path d="M17 6h6v6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  Pencil: () => (
+    <svg
+      width="13"
+      height="13"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path
+        d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 // --- Card metadata for EOA theming ---
@@ -3673,6 +3694,24 @@ export default function AnoBankMobileApp() {
   const [showQrGenerator, setShowQrGenerator] = useState(false);
   const [selectedCardIdx, setSelectedCardIdx] = useState<number | null>(null);
   const [balanceVisible, setBalanceVisible] = useState(true);
+  const [userName, setUserName] = useState<string>(
+    () => localStorage.getItem("userName") ?? "",
+  );
+  const [editingUserName, setEditingUserName] = useState(false);
+  const [cardNames, setCardNames] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cardNames") ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [editingCardAddr, setEditingCardAddr] = useState<string | null>(null);
+  useEffect(() => {
+    localStorage.setItem("userName", userName);
+  }, [userName]);
+  useEffect(() => {
+    localStorage.setItem("cardNames", JSON.stringify(cardNames));
+  }, [cardNames]);
 
   // ── Gate: Privy not ready
   if (!privyReady) {
@@ -3871,9 +3910,10 @@ export default function AnoBankMobileApp() {
       dailyLimit: "0",
       remaining: "0",
     };
+    const defaultName = i === 0 ? "Main Account" : meta.name;
     return {
       id: i,
-      name: i === 0 ? "Main Account" : meta.name,
+      name: cardNames[addr.toLowerCase()] ?? defaultName,
       emoji: i === 0 ? "🏦" : meta.emoji,
       color: i === 0 ? C.accent : meta.color,
       address: addr,
@@ -3995,15 +4035,61 @@ export default function AnoBankMobileApp() {
                     >
                       Good day,
                     </div>
-                    <div
-                      style={{
-                        color: C.textPrimary,
-                        fontSize: 22,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {shortenAddr(userAddress, 4)}
-                    </div>
+                    {editingUserName ? (
+                      <input
+                        autoFocus
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        onBlur={() => setEditingUserName(false)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && setEditingUserName(false)
+                        }
+                        placeholder={shortenAddr(userAddress, 4)}
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 700,
+                          color: C.textPrimary,
+                          background: "transparent",
+                          border: "none",
+                          borderBottom: `2px solid ${C.accent}`,
+                          outline: "none",
+                          width: 180,
+                          padding: "2px 0",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            color: C.textPrimary,
+                            fontSize: 22,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {userName || shortenAddr(userAddress, 4)}
+                        </span>
+                        <button
+                          onClick={() => setEditingUserName(true)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: C.textTertiary,
+                            padding: 4,
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Icon.Pencil />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setTab("settings")}
@@ -4857,32 +4943,39 @@ export default function AnoBankMobileApp() {
                   }}
                 >
                   {/* Revenue row */}
-                  {[
-                    {
-                      emoji: "💰",
-                      label: "Revenue",
-                      value: "+€3420.00",
-                      color: C.accent,
-                      bar: "#6C5CE7",
-                      pct: 90,
-                    },
-                    {
-                      emoji: "🧾",
-                      label: "Expenses",
-                      value: "-€1247.33",
-                      color: C.red,
-                      bar: C.red,
-                      pct: 36,
-                    },
-                    {
-                      emoji: "📈",
-                      label: "Yield earned",
-                      value: "+€78.54",
-                      color: C.green,
-                      bar: C.green,
-                      pct: 2,
-                    },
-                  ].map((row, i, arr) => (
+                  {(() => {
+                    const balance = parseFloat(nativeBalance) || 0;
+                    const expenses = monthlySpent;
+                    // Revenue = what's in the account + what was spent out this month
+                    const revenue = balance + expenses;
+                    const maxVal = Math.max(revenue, expenses, 0.01);
+                    return [
+                      {
+                        emoji: "💰",
+                        label: "Revenue",
+                        value: `+$${revenue.toFixed(2)}`,
+                        color: C.accent,
+                        bar: C.accent,
+                        pct: Math.round((revenue / maxVal) * 100),
+                      },
+                      {
+                        emoji: "🧾",
+                        label: "Expenses",
+                        value: expenses > 0 ? `-$${expenses.toFixed(2)}` : "$0.00",
+                        color: expenses > 0 ? C.red : C.textTertiary,
+                        bar: C.red,
+                        pct: Math.round((expenses / maxVal) * 100),
+                      },
+                      {
+                        emoji: "📈",
+                        label: "Yield earned",
+                        value: "+$0.00",
+                        color: C.green,
+                        bar: C.green,
+                        pct: 0,
+                      },
+                    ];
+                  })().map((row, i, arr) => (
                     <div
                       key={row.label}
                       style={{ marginBottom: i < arr.length - 1 ? 18 : 0 }}
@@ -4965,7 +5058,9 @@ export default function AnoBankMobileApp() {
                         fontWeight: 700,
                       }}
                     >
-                      +€2251.21
+                      {parseFloat(nativeBalance) >= 0
+                        ? `+$${parseFloat(nativeBalance).toFixed(2)}`
+                        : `-$${Math.abs(parseFloat(nativeBalance)).toFixed(2)}`}
                     </span>
                   </div>
 
@@ -4987,8 +5082,9 @@ export default function AnoBankMobileApp() {
                     <span
                       style={{ color: C.green, fontSize: 13, lineHeight: 1.55 }}
                     >
-                      Your assets generated <strong>€78.54</strong> in yield
-                      this month at 3.82% APY — paid daily to your balance.
+                      Your current balance is{" "}
+                      <strong>${parseFloat(nativeBalance).toFixed(2)}</strong>.
+                      Yield tracking coming soon.
                     </span>
                   </div>
                 </div>
@@ -5265,12 +5361,76 @@ export default function AnoBankMobileApp() {
                         >
                           <div
                             style={{
-                              color: C.textPrimary,
-                              fontSize: 14,
-                              fontWeight: 600,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
                             }}
                           >
-                            {card.name}
+                            {editingCardAddr === card.address ? (
+                              <input
+                                autoFocus
+                                value={
+                                  cardNames[card.address.toLowerCase()] ??
+                                  card.name
+                                }
+                                onChange={(e) =>
+                                  setCardNames((prev) => ({
+                                    ...prev,
+                                    [card.address.toLowerCase()]: e.target.value,
+                                  }))
+                                }
+                                onBlur={() => setEditingCardAddr(null)}
+                                onKeyDown={(e) =>
+                                  e.key === "Enter" && setEditingCardAddr(null)
+                                }
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: 600,
+                                  color: C.textPrimary,
+                                  background: "transparent",
+                                  border: "none",
+                                  borderBottom: `2px solid ${C.accent}`,
+                                  outline: "none",
+                                  width: 130,
+                                  padding: "1px 0",
+                                }}
+                              />
+                            ) : (
+                              <>
+                                <span
+                                  style={{
+                                    color: C.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {card.name}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCardNames((prev) => ({
+                                      ...prev,
+                                      [card.address.toLowerCase()]:
+                                        prev[card.address.toLowerCase()] ??
+                                        card.name,
+                                    }));
+                                    setEditingCardAddr(card.address);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    color: C.textTertiary,
+                                    padding: 3,
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Icon.Pencil />
+                                </button>
+                              </>
+                            )}
                           </div>
                           <div
                             style={{
