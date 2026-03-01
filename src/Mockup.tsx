@@ -722,6 +722,7 @@ function TransferModal({
   } | null>(null);
   const [withdrawalStatus, setWithdrawalStatus] = useState("pending");
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const [err, setErr] = useState("");
   const [showScanner, setShowScanner] = useState(false);
 
@@ -759,11 +760,12 @@ function TransferModal({
   }, [stage, txHash, spendInteractorAddress]);
 
   async function handlePathA() {
-    if (!amount || !recipient || sending) return;
+    if (!amount || !recipient || sendingRef.current) return;
     if (!selectedCard) {
       setErr("No spending card available. Add a card first.");
       return;
     }
+    sendingRef.current = true;
     setSending(true);
     setErr("");
     try {
@@ -801,12 +803,14 @@ function TransferModal({
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
 
   async function handlePathB() {
-    if (!amount || !recipient || sending) return;
+    if (!amount || !recipient || sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
     setErr("");
     try {
@@ -844,6 +848,7 @@ function TransferModal({
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
